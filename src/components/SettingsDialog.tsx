@@ -110,7 +110,7 @@ export function SettingsDialog() {
             <a href="https://getsongbpm.com/api" target="_blank" rel="noreferrer">
               GetSongBPM
             </a>
-            . It is used to look up a song's tempo and key.
+            . It is optional. Without one, tempo and key are read from a short preview of the song.
           </p>
         </div>
         <h3 className="section-label">Keyboard shortcuts</h3>

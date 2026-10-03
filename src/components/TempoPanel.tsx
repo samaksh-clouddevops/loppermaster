@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { analyzePreview } from '../lib/audioAnalysis';
 import { getApiKey, subscribeApiKey } from '../lib/apiKey';
-import { lookupSong, type LookupResult } from '../lib/getsongbpm';
+import { lookupSong, type LookupResult, type SongMatch } from '../lib/getsongbpm';
 import { createMetronome, type Metronome } from '../lib/metronome';
 import { usePracticeState } from '../state/hooks';
 
-type Source = 'catalog' | 'tap' | 'manual';
+type Source = 'catalog' | 'preview' | 'tap' | 'manual';
 
 export function TempoPanel() {
   const { videoId, videoTitle, author, status, playbackRate, view } = usePracticeState();
@@ -21,7 +22,7 @@ export function TempoPanel() {
   const taps = useRef<number[]>([]);
   const metro = useRef<Metronome | null>(null);
 
-  const clickBpm = source === 'catalog' && baseBpm > 0 ? Math.round(baseBpm * playbackRate) : baseBpm;
+  const clickBpm = (source === 'catalog' || source === 'preview') && baseBpm > 0 ? Math.round(baseBpm * playbackRate) : baseBpm;
   const match = lookup.status === 'found' ? lookup.match : null;
 
   function engine() {
@@ -49,21 +50,46 @@ export function TempoPanel() {
 
   useEffect(() => {
     if (status !== 'ready' || !videoId || !videoTitle) return;
-    if (!apiKey) {
-      setLookup({ status: 'needs-key' });
-      return;
-    }
     let cancelled = false;
     setLookup({ status: 'loading' });
-    lookupSong(apiKey, videoTitle, author).then((result) => {
-      if (cancelled) return;
-      setLookup(result);
-      if (result.status === 'found') {
-        setBaseBpm(result.match.bpm);
-        setBeats(result.match.beatsPerBar);
-        setSource('catalog');
+    const apply = (match: SongMatch, nextSource: Source) => {
+      setLookup({ status: 'found', match });
+      setBaseBpm(match.bpm);
+      setBeats(match.beatsPerBar || 4);
+      setSource(nextSource);
+    };
+    void (async () => {
+      if (apiKey) {
+        const catalog = await lookupSong(apiKey, videoTitle, author);
+        if (cancelled) return;
+        if (catalog.status === 'found') {
+          apply(catalog.match, 'catalog');
+          return;
+        }
+        if (catalog.status === 'invalid-key') setLookup(catalog);
       }
-    });
+      const preview = await analyzePreview(videoTitle, author);
+      if (cancelled) return;
+      if (preview) {
+        apply(
+          {
+            id: '',
+            title: preview.title,
+            artist: preview.artist,
+            bpm: preview.bpm,
+            keyName: preview.keyName,
+            openKey: '',
+            beatsPerBar: 4,
+            notes: preview.notes,
+            pageUrl: preview.pageUrl,
+            sourceName: 'a preview',
+          },
+          'preview',
+        );
+        return;
+      }
+      if (!cancelled) setLookup(apiKey ? { status: 'empty' } : { status: 'needs-key' });
+    })();
     return () => {
       cancelled = true;
     };
@@ -180,21 +206,12 @@ export function TempoPanel() {
       </div>
       <p className="rate-note">
         The metronome follows the tempo you hear, so slowing the video slows the click.
-        {match ? (
+        {match && (
           <>
             {' '}
             Song data from{' '}
             <a href={match.pageUrl} target="_blank" rel="noreferrer">
-              GetSongBPM
-            </a>
-            .
-          </>
-        ) : (
-          <>
-            {' '}
-            Catalog data from{' '}
-            <a href="https://getsongbpm.com/" target="_blank" rel="noreferrer">
-              GetSongBPM
+              {match.sourceName}
             </a>
             .
           </>
@@ -218,6 +235,13 @@ function TempoCaption({
   if (clickBpm <= 0) return <p className="rate-note">Look up the song, or tap along with it.</p>;
   if (source === 'tap') return <p className="rate-note">From your taps, at the speed you are hearing.</p>;
   if (source === 'manual') return <p className="rate-note">Set by hand for this practice speed.</p>;
+  if (source === 'preview') {
+    return (
+      <p className="rate-note">
+        From a preview of the song{Math.abs(playbackRate - 1) < 0.001 ? `, ${baseBpm} BPM` : `. At ${playbackRate.toFixed(2)}× the click is ${clickBpm}`}.
+      </p>
+    );
+  }
   if (Math.abs(playbackRate - 1) < 0.001) return <p className="rate-note">Catalog tempo, {baseBpm} BPM.</p>;
   return (
     <p className="rate-note">
@@ -233,8 +257,8 @@ function LookupStatus({
   lookup: LookupResult | { status: 'idle' } | { status: 'loading' } | { status: 'needs-key' };
   hasKey: boolean;
 }) {
-  if (!hasKey || lookup.status === 'needs-key') {
-    return <p className="rate-note">Add a GetSongBPM API key in Settings to look up tempo and key.</p>;
+  if (!hasKey && lookup.status === 'needs-key') {
+    return <p className="rate-note">No song preview was found. Tap the tempo, or add a GetSongBPM key in Settings.</p>;
   }
   if (lookup.status === 'loading' || lookup.status === 'idle') {
     return (

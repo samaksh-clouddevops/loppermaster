@@ -10,6 +10,7 @@ export interface SongMatch {
   beatsPerBar: number;
   notes: string[];
   pageUrl: string;
+  sourceName: string;
 }
 
 export type LookupResult =
@@ -20,6 +21,7 @@ export type LookupResult =
 
 const PITCHES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
 const FLATS: Record<string, string> = { DB: 'C#', EB: 'D#', GB: 'F#', AB: 'G#', BB: 'A#' };
+const SHARP_TO_FLAT: Record<string, string> = { 'C#': 'Db', 'D#': 'Eb', 'F#': 'Gb', 'G#': 'Ab', 'A#': 'Bb' };
 const MAJOR = [0, 2, 4, 5, 7, 9, 11];
 const MINOR = [0, 2, 3, 5, 7, 8, 10];
 
@@ -51,12 +53,16 @@ export function scaleNotes(keyName: string): string[] {
   if (!match || !match[3]) return [];
   const accidental = (match[2] ?? '').replace('♯', '#').replace('♭', 'b');
   const spelled = `${match[1].toUpperCase()}${accidental.toUpperCase()}`;
+  const minor = /^(m|min|minor)$/i.test(match[3]);
+  const useFlats = (minor ? ['D', 'G', 'C', 'F', 'BB', 'EB'] : ['F', 'BB', 'EB', 'AB', 'DB', 'GB']).includes(spelled);
   const pitch = FLATS[spelled] ?? spelled;
   const root = PITCHES.indexOf(pitch as (typeof PITCHES)[number]);
   if (root < 0) return [];
-  const minor = /^m/i.test(match[3]);
   const steps = minor ? MINOR : MAJOR;
-  return steps.map((step) => PITCHES[(root + step) % 12]);
+  return steps.map((step) => {
+    const note = PITCHES[(root + step) % 12];
+    return useFlats ? (SHARP_TO_FLAT[note] ?? note) : note;
+  });
 }
 
 function beatsPerBar(value: unknown) {
@@ -90,6 +96,7 @@ function toMatch(song: RawSong): SongMatch | null {
     beatsPerBar: beatsPerBar(song.time_sig),
     notes: keyName ? scaleNotes(keyName) : [],
     pageUrl: pageUrl(song),
+    sourceName: 'GetSongBPM',
   };
 }
 
