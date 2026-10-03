@@ -81,7 +81,7 @@ export function useYouTubePlayer(hostRef: RefObject<HTMLDivElement | null>, vide
     const frame = () => {
       rafId = window.requestAnimationFrame(frame);
       if (!playingRef.current || document.hidden || store.isScrubbing) return;
-      const elapsed = Math.min(0.3, (performance.now() - lastPollAt) / 1000);
+      const elapsed = Math.min(0.12, (performance.now() - lastPollAt) / 1000);
       const predicted = lastPolled + elapsed * (stateRef.current.playbackRate || 1);
       publish(predicted);
     };

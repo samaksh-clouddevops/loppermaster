@@ -13,6 +13,7 @@ export interface Lyrics {
   lines: LyricLine[];
   source: string;
   sourceUrl: string;
+  duration: number;
 }
 
 export type LyricsResult = { status: 'found'; lyrics: Lyrics } | { status: 'empty' } | { status: 'failed' };
@@ -74,9 +75,7 @@ function score(item: RawLyrics, song: string, artist: string, duration: number) 
   if (wantedArtist && name.includes(wantedArtist)) value += 4;
   if (duration > 0 && item.duration) {
     const delta = Math.abs(item.duration - duration);
-    if (delta <= 3) value += 4;
-    else if (delta <= 10) value += 1;
-    else value -= 2;
+    value += Math.max(-12, 6 - delta / 2);
   }
   if (item.syncedLyrics) value += 2;
   return value;
@@ -95,6 +94,7 @@ function toLyrics(item: RawLyrics): Lyrics | null {
     lines,
     source: 'LRCLIB',
     sourceUrl: item.id ? `https://lrclib.net/tracks/${item.id}` : 'https://lrclib.net/',
+    duration: item.duration && item.duration > 0 ? item.duration : 0,
   };
 }
 
@@ -126,6 +126,7 @@ async function searchLyricsOvh(query: SongQuery): Promise<Lyrics | null> {
     lines,
     source: 'lyrics.ovh',
     sourceUrl: 'https://lyrics.ovh/',
+    duration: 0,
   };
 }
 
@@ -146,7 +147,9 @@ export async function fetchLyrics(videoTitle: string, videoArtist: string, durat
       const results = await searchLrcLib(query);
       const best = bestFrom(results, query, duration);
       if (best && (!winner || best.rank > winner.rank)) winner = best;
-      if (winner && winner.rank >= 8) return { status: 'found', lyrics: winner.lyrics };
+      if (winner && winner.rank >= 8 && durationClose(winner.lyrics.duration, duration)) {
+        return { status: 'found', lyrics: winner.lyrics };
+      }
     } catch {
       sawFailure = true;
     }
@@ -166,13 +169,19 @@ export async function fetchLyrics(videoTitle: string, videoArtist: string, durat
   return sawFailure ? { status: 'failed' } : { status: 'empty' };
 }
 
-export function lineAtTime(lines: LyricLine[], seconds: number) {
+export function lineAtTime(lines: LyricLine[], seconds: number, offset = 0) {
+  const lookup = seconds - offset;
   let active = -1;
   for (let index = 0; index < lines.length; index += 1) {
     const time = lines[index].time;
     if (time == null) continue;
-    if (time <= seconds + 0.05) active = index;
+    if (time <= lookup + 0.05) active = index;
     else break;
   }
   return active;
+}
+
+function durationClose(lyricDuration: number, videoDuration: number) {
+  if (lyricDuration <= 0 || videoDuration <= 0) return true;
+  return Math.abs(lyricDuration - videoDuration) <= 8;
 }

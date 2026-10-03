@@ -1589,6 +1589,30 @@ body.tour-open {
   color: var(--color-accent-strong);
 }
 
+.lyric-sync {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.lyric-nudge {
+  min-height: 36px;
+  padding: 0 8px;
+  font-size: 13px;
+}
+
+.lyric-sync-readout {
+  grid-column: 1 / -1;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-muted-foreground);
+}
+
+.lyric-sync-slider .range {
+  height: 32px;
+}
+
 .lyrics-scroll {
   overflow: auto;
   display: grid;

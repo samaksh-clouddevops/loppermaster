@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { fetchLyrics, lineAtTime, type LyricLine, type LyricsResult } from '../lib/lyrics';
+import { formatTime } from '../lib/time';
 import { seekTo, store } from '../state/store';
 import { usePracticeState } from '../state/hooks';
 
@@ -7,8 +8,21 @@ export function LyricsPanel() {
   const { videoId, videoTitle, author, duration, status } = usePracticeState();
   const [result, setResult] = useState<LyricsResult | { status: 'loading' } | { status: 'idle' }>({ status: 'idle' });
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [offset, setOffset] = useState(0);
   const scroller = useRef<HTMLDivElement>(null);
   const lines = result.status === 'found' ? result.lyrics.lines : [];
+  const synced = result.status === 'found' && result.lyrics.synced;
+
+  useEffect(() => {
+    if (!videoId) return;
+    setOffset(readLyricOffset(videoId));
+  }, [videoId]);
+
+  function changeOffset(next: number) {
+    const value = clampOffset(next);
+    setOffset(value);
+    if (videoId) writeLyricOffset(videoId, value);
+  }
 
   useEffect(() => {
     if (status !== 'ready' || !videoId || !videoTitle) return;
@@ -27,12 +41,12 @@ export function LyricsPanel() {
     if (result.status !== 'found' || !result.lyrics.synced) return;
     const lyricLines = result.lyrics.lines;
     const update = () => {
-      const next = lineAtTime(lyricLines, store.getState().currentTime);
+      const next = lineAtTime(lyricLines, store.getState().currentTime, offset);
       setActiveIndex((current) => (current === next ? current : next));
     };
     update();
     return store.subscribeTime(update);
-  }, [result]);
+  }, [offset, result]);
 
   useEffect(() => {
     const current = scroller.current?.querySelector<HTMLElement>('[aria-current="true"]');
@@ -52,8 +66,52 @@ export function LyricsPanel() {
       <section className="panel lyrics-panel" aria-labelledby="lyrics-label">
       <div className="tempo-head">
         <h2 id="lyrics-label">Lyrics</h2>
-        {result.status === 'found' && result.lyrics.synced && <span className="transport-status">Follows video</span>}
+        {synced && <span className="transport-status">Follows video</span>}
       </div>
+      {synced && (
+        <div className="lyric-sync">
+          <button
+            className="btn lyric-nudge"
+            type="button"
+            onClick={() => {
+              setOffset((value) => {
+                const next = clampOffset(value - 0.5);
+                if (videoId) writeLyricOffset(videoId, next);
+                return next;
+              });
+            }}
+          >
+            Earlier
+          </button>
+          <label className="lyric-sync-slider">
+            <span className="sr-only">Lyric sync</span>
+            <input
+              className="range"
+              type="range"
+              min={-20}
+              max={20}
+              step={0.1}
+              value={offset}
+              aria-valuetext={formatOffset(offset)}
+              onChange={(event) => changeOffset(Number(event.target.value))}
+            />
+          </label>
+          <button
+            className="btn lyric-nudge"
+            type="button"
+            onClick={() => {
+              setOffset((value) => {
+                const next = clampOffset(value + 0.5);
+                if (videoId) writeLyricOffset(videoId, next);
+                return next;
+              });
+            }}
+          >
+            Later
+          </button>
+          <span className="lyric-sync-readout">{formatOffset(offset)}</span>
+        </div>
+      )}
       {result.status === 'found' && (
         <p className="tempo-match">
           {result.lyrics.artistName ? `${result.lyrics.artistName} — ` : ''}
@@ -76,11 +134,41 @@ export function LyricsPanel() {
             <a href="https://lyrics.ovh/" target="_blank" rel="noreferrer">lyrics.ovh</a> if needed.
           </>
         )}{' '}
+        {synced && result.status === 'found' && result.lyrics.duration > 0 && duration > 0 && Math.abs(result.lyrics.duration - duration) > 3
+          ? `Timed to a ${formatTime(result.lyrics.duration)} recording. This video is ${formatTime(duration)}. `
+          : ''}
         Click a timed line to jump the video there.
       </p>
       </section>
     </div>
   );
+}
+
+function clampOffset(value: number) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(20, Math.max(-20, Math.round(value * 10) / 10));
+}
+
+function formatOffset(offset: number) {
+  if (Math.abs(offset) < 0.05) return 'In sync';
+  const seconds = Math.abs(offset).toFixed(1);
+  return offset > 0 ? `${seconds}s later` : `${seconds}s earlier`;
+}
+
+function readLyricOffset(videoId: string) {
+  try {
+    return clampOffset(Number(localStorage.getItem(`loopmaster.lyricSync.${videoId}`)));
+  } catch {
+    return 0;
+  }
+}
+
+function writeLyricOffset(videoId: string, offset: number) {
+  try {
+    localStorage.setItem(`loopmaster.lyricSync.${videoId}`, String(offset));
+  } catch {
+    /* Sync still works until the page reloads. */
+  }
 }
 
 function LyricsBody({
