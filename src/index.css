@@ -822,6 +822,7 @@ button:disabled {
 .loop-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
 }
 
@@ -927,9 +928,14 @@ button:disabled {
 
 .speed-value {
   min-width: 6ch;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   font-family: var(--font-mono);
   font-size: 40px;
+  line-height: 1;
   font-weight: 500;
   letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
@@ -1557,6 +1563,11 @@ kbd {
     flex-wrap: nowrap;
   }
 
+  .rail .tempo-bpm,
+  .rail .tempo-key {
+    min-height: 32px;
+  }
+
   .rail .tempo-bpm strong,
   .rail .tempo-key {
     font-size: 18px;
@@ -1699,6 +1710,7 @@ kbd {
   }
 
   .speed-value {
+    height: 36px;
     font-size: 22px;
   }
 
@@ -1957,6 +1969,38 @@ body.tour-open {
   justify-content: space-between;
 }
 
+.tempo-head h2 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.tempo-bpm {
+  min-height: 44px;
+}
+
+.tempo-bpm strong,
+.tempo-key {
+  font-family: var(--font-mono);
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.tempo-bpm strong {
+  min-width: 3.2ch;
+  text-align: center;
+}
+
+.tempo-key {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  margin: 0;
+}
+
 .tempo-match {
   margin: 0;
   font-weight: 600;
@@ -1966,20 +2010,6 @@ body.tour-open {
 .tempo-stats {
   display: grid;
   gap: 8px;
-}
-
-.tempo-bpm strong,
-.tempo-key {
-  font-family: var(--font-mono);
-  font-size: 32px;
-  font-weight: 500;
-  letter-spacing: -0.04em;
-  font-variant-numeric: tabular-nums;
-}
-
-.tempo-key {
-  display: block;
-  margin-top: 4px;
 }
 
 .scale-notes {
@@ -2004,6 +2034,11 @@ body.tour-open {
 
 .metro-row {
   flex-wrap: wrap;
+  min-height: 44px;
+}
+
+.metro-row .range {
+  height: 28px;
 }
 
 .beat-dots {
