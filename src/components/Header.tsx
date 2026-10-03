@@ -1,9 +1,9 @@
-import { openSettings, setView } from '../state/store';
+import { openSettings, openWalkthrough, setView } from '../state/store';
 import { usePracticeState } from '../state/hooks';
 import { IconSettings } from './Icons';
 
 export function Header() {
-  const { view, savedLoops, settingsOpen } = usePracticeState();
+  const { view, savedLoops, settingsOpen, walkthroughOpen } = usePracticeState();
 
   return (
     <header className="header">
@@ -42,6 +42,15 @@ export function Header() {
         </button>
       </nav>
       <div className="header-actions">
+        <button
+          className="tour-launch"
+          type="button"
+          aria-expanded={walkthroughOpen}
+          aria-controls="tour-dialog"
+          onClick={openWalkthrough}
+        >
+          Tour
+        </button>
         <button
           className="icon-btn"
           type="button"

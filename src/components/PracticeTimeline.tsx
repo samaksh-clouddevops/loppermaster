@@ -86,7 +86,7 @@ export function PracticeTimeline() {
   }
 
   return (
-    <section className="timeline" aria-labelledby="timeline-label">
+    <section className="timeline" aria-labelledby="timeline-label" data-tour="timeline">
       <div className="timeline-meta">
         <span>{formatTime(0)}</span>
         <p id="timeline-label" className="timeline-mid">

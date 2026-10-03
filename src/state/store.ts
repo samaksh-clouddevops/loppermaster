@@ -4,6 +4,7 @@ import {
   loadHistory,
   loadPreferences,
   loadSavedLoops,
+  markTourSeen,
   saveHistory,
   savePreferences,
   saveSavedLoops,
@@ -43,6 +44,7 @@ function readInitial(): PracticeState {
   return {
     view: 'practice',
     settingsOpen: false,
+    walkthroughOpen: false,
     inputValue: videoId ? canonicalWatchUrl(videoId) : '',
     inputError: null,
     videoId,
@@ -177,6 +179,15 @@ export function openSettings() {
 
 export function closeSettings() {
   store.set({ settingsOpen: false });
+}
+
+export function openWalkthrough() {
+  store.set({ walkthroughOpen: true, settingsOpen: false, view: 'practice' });
+}
+
+export function closeWalkthrough() {
+  markTourSeen();
+  store.set({ walkthroughOpen: false });
 }
 
 export function loadVideo(videoId: string, options: LoadOptions = {}) {

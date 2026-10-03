@@ -1,3 +1,4 @@
+import { openWalkthrough } from '../state/store';
 import { IconBookmark, IconRepeat, IconSpeed } from './Icons';
 import { VideoLoader } from './VideoLoader';
 import { useFocusHeading } from '../state/hooks';
@@ -30,6 +31,9 @@ export function EmptyState({ view }: { view: View }) {
         Practice smarter.
       </h1>
       <p className="hero-lede">Slow down. Loop. Learn.</p>
+      <button className="text-btn tour-link" type="button" onClick={openWalkthrough}>
+        Take the tour
+      </button>
       <VideoLoader prominent />
       <div className="feature-grid">
         {features.map((feature) => (

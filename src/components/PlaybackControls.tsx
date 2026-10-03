@@ -40,7 +40,7 @@ export function PlaybackControls({ stageRef }: { stageRef: RefObject<HTMLDivElem
   const silent = muted || volume === 0;
 
   return (
-    <div className="transport">
+    <div className="transport" data-tour="transport">
       <div className="transport-main">
         <button className="skip-btn" type="button" onClick={() => seekBy(-5)} aria-label="Back 5 seconds">
           <IconSkipBack />

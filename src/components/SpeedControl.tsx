@@ -8,7 +8,7 @@ export function SpeedControl() {
   const fill = ((playbackRate - MIN_RATE) / (MAX_RATE - MIN_RATE)) * 100;
 
   return (
-    <section className="panel speed" aria-labelledby="speed-label">
+    <section className="panel speed" aria-labelledby="speed-label" data-tour="speed">
       <div className="speed-head">
         <h2 id="speed-label">Playback speed</h2>
       </div>

@@ -17,7 +17,7 @@ export function CurrentLoopCard() {
   }
 
   return (
-    <section className="panel loop-card" aria-labelledby="current-loop-title">
+    <section className="panel loop-card" aria-labelledby="current-loop-title" data-tour="save">
       <h2 id="current-loop-title" className="section-label">
         Current loop
       </h2>

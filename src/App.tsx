@@ -6,9 +6,10 @@ import { PracticeWorkspace } from './components/PracticeWorkspace';
 import { HistoryPanel, SavedLoops } from './components/SavedLoops';
 import { SettingsDialog } from './components/SettingsDialog';
 import { KeyboardShortcuts } from './components/KeyboardShortcuts';
+import { Walkthrough } from './components/Walkthrough';
 
 export function App() {
-  const { view, settingsOpen } = usePracticeState();
+  const { view, settingsOpen, walkthroughOpen } = usePracticeState();
 
   useEffect(() => {
     loadYouTubeApi().catch(() => undefined);
@@ -16,7 +17,7 @@ export function App() {
 
   return (
     <div className="app">
-      <div className="shell" inert={settingsOpen ? true : undefined}>
+      <div className="shell" inert={settingsOpen || walkthroughOpen ? true : undefined}>
         <a className="skip" href="#workspace">
           Skip to workspace
         </a>
@@ -28,6 +29,7 @@ export function App() {
         </main>
       </div>
       <SettingsDialog />
+      <Walkthrough />
       <KeyboardShortcuts />
     </div>
   );

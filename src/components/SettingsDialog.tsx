@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { clearHistory, closeSettings } from '../state/store';
+import { getApiKey, setApiKey } from '../lib/apiKey';
+import { clearHistory, closeSettings, openWalkthrough } from '../state/store';
 import { usePracticeState } from '../state/hooks';
 import { IconClose } from './Icons';
 
@@ -17,12 +18,16 @@ export function SettingsDialog() {
   const { settingsOpen, history } = usePracticeState();
   const dialogRef = useRef<HTMLDivElement>(null);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [apiKey, setApiKeyField] = useState('');
+  const apiKeyRef = useRef(apiKey);
+  apiKeyRef.current = apiKey;
 
   useEffect(() => {
     if (!settingsOpen) {
       setConfirmClear(false);
       return;
     }
+    setApiKeyField(getApiKey());
     const dialog = dialogRef.current;
     if (!dialog) return;
     const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -56,6 +61,7 @@ export function SettingsDialog() {
     return () => {
       document.removeEventListener('keydown', onKeyDown);
       previouslyFocused?.focus();
+      setApiKey(apiKeyRef.current);
     };
   }, [settingsOpen]);
 
@@ -83,7 +89,30 @@ export function SettingsDialog() {
             <IconClose />
           </button>
         </div>
-        <p className="library-copy">Saved loops and history stay in this browser.</p>
+        <p className="library-copy">Saved loops, history, and your GetSongBPM key stay in this browser.</p>
+        <div className="settings-key">
+          <label className="section-label" htmlFor="getsongbpm-key">
+            GetSongBPM API key
+          </label>
+          <input
+            id="getsongbpm-key"
+            className="field"
+            type="password"
+            autoComplete="off"
+            spellCheck={false}
+            value={apiKey}
+            placeholder="Paste your free API key"
+            onChange={(event) => setApiKeyField(event.target.value)}
+            onBlur={() => setApiKey(apiKey)}
+          />
+          <p className="rate-note">
+            Get a free key at{' '}
+            <a href="https://getsongbpm.com/api" target="_blank" rel="noreferrer">
+              GetSongBPM
+            </a>
+            . It is used to look up a song's tempo and key.
+          </p>
+        </div>
         <h3 className="section-label">Keyboard shortcuts</h3>
         <ul className="shortcut-list">
           {shortcuts.map(([keys, description]) => (
@@ -95,6 +124,9 @@ export function SettingsDialog() {
         </ul>
         <p className="rate-note">Shortcuts apply while the practice workspace is focused, outside the video frame.</p>
         <div className="dialog-footer">
+          <button className="btn" type="button" onClick={openWalkthrough}>
+            Replay tour
+          </button>
           {confirmClear ? (
             <div className="confirm-row">
               <span>Clear {history.length} video{history.length === 1 ? '' : 's'} from history?</span>

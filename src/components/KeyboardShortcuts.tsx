@@ -11,7 +11,7 @@ export function KeyboardShortcuts() {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       const state = store.getState();
-      if (state.view !== 'practice' || state.settingsOpen) return;
+      if (state.view !== 'practice' || state.settingsOpen || state.walkthroughOpen) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       if (isTypingTarget(event.target)) return;
 

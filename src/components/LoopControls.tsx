@@ -6,7 +6,7 @@ export function LoopControls() {
   const { loopEnabled } = usePracticeState();
 
   return (
-    <div className="loop-actions">
+    <div className="loop-actions" data-tour="loop">
       <button className="btn set-btn" type="button" onClick={() => setLoopAtPlayhead('a')} aria-keyshortcuts="A">
         Set A
       </button>

@@ -18,7 +18,7 @@ export function VideoLoader({ prominent = false }: { prominent?: boolean }) {
         <label className={prominent ? 'url-label' : 'section-label'} htmlFor="youtube-url">
           {prominent ? 'Practice any YouTube video' : 'YouTube URL'}
         </label>
-        <div className="url-row">
+        <div className="url-row" data-tour="paste">
           <input
             id="youtube-url"
             className="field"

@@ -26,6 +26,7 @@ export interface HistoryEntry {
 export interface PracticeState {
   view: View;
   settingsOpen: boolean;
+  walkthroughOpen: boolean;
   inputValue: string;
   inputError: string | null;
   videoId: string | null;

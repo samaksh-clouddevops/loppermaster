@@ -3,6 +3,7 @@ import type { HistoryEntry, SavedLoop } from '../types';
 const LOOPS_KEY = 'loopmaster.loops';
 const HISTORY_KEY = 'loopmaster.history';
 const PREFS_KEY = 'loopmaster.preferences';
+const TOUR_KEY = 'loopmaster.tourSeen';
 
 export interface Preferences {
   volume: number;
@@ -91,4 +92,20 @@ export function loadPreferences(): Preferences {
 
 export function savePreferences(preferences: Preferences) {
   writeJson(PREFS_KEY, preferences);
+}
+
+export function hasSeenTour(): boolean {
+  try {
+    return localStorage.getItem(TOUR_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function markTourSeen() {
+  try {
+    localStorage.setItem(TOUR_KEY, '1');
+  } catch {
+    /* The tour can still close if storage is blocked. */
+  }
 }
