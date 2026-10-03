@@ -21,6 +21,8 @@ function stripNoise(title: string) {
     /\bfull\s+audio\b/gi,
     /\bfull\s+video\b/gi,
     /\bfull\s+songs?\b/gi,
+    /\bwith\s+lyrics\b/gi,
+    /\bm\/?v\b/gi,
   ];
   let value = title.replace(/\s*[([].*?[)\]]/g, (chunk) => (NOISE.test(chunk) ? '' : chunk));
   for (const phrase of phrases) value = value.replace(phrase, ' ');
@@ -50,6 +52,13 @@ export function practiceQueries(title: string, artist: string): SongQuery[] {
     queries.push({ artist: artistName, song });
   };
 
+  const quoted = title.match(/(?:^|[\s|(])["“']([^"“'”]{1,80})["”']/);
+  if (quoted?.[1]) {
+    const song = tidy(quoted[1]);
+    push('', song);
+    push(channel, song);
+  }
+
   const addDashSplit = (value: string) => {
     const parts = value.split(/\s+[-–—]\s+/);
     if (parts.length < 2) return;
@@ -61,9 +70,11 @@ export function practiceQueries(title: string, artist: string): SongQuery[] {
   };
 
   if (cleanedTitle.includes('|')) {
-    const lead = tidy(cleanedTitle.split('|')[0] ?? '');
+    const segments = cleanedTitle.split('|').map((segment) => tidy(segment)).filter(Boolean);
+    const lead = segments[0] ?? '';
     push('', lead);
     push(channel, lead);
+    for (const segment of segments.slice(1, 5)) push(segment, lead);
     addDashSplit(lead);
   } else {
     addDashSplit(cleanedTitle);

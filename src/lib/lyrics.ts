@@ -112,6 +112,44 @@ async function searchLrcLib(query: SongQuery): Promise<RawLyrics[]> {
   return Array.isArray(payload) ? (payload as RawLyrics[]) : [];
 }
 
+async function searchMux(query: SongQuery): Promise<Lyrics | null> {
+  if (!query.artist || !query.song) return null;
+  const params = new URLSearchParams({
+    artist: query.artist,
+    title: query.song,
+    level: 'none',
+    format: 'json',
+  });
+  const response = await fetch(`https://api.lrcmux.dev/get?${params.toString()}`);
+  if (response.status === 404 || response.status === 400) return null;
+  if (!response.ok) throw new Error(String(response.status));
+  const payload = (await response.json()) as {
+    track?: { title?: string; artist?: string; album?: string; duration?: number };
+    meta?: { instrumental?: boolean; level?: string; source?: { name?: string } };
+    lines?: { text?: string; start?: number }[];
+  };
+  const lines = (payload.lines ?? [])
+    .map((line) => ({
+      time: typeof line.start === 'number' ? line.start / 1000 : null,
+      text: line.text?.trim() ?? '',
+    }))
+    .filter((line) => line.text);
+  if (lines.length === 0 && !payload.meta?.instrumental) return null;
+  const synced = lines.some((line) => line.time != null);
+  return {
+    trackName: payload.track?.title?.trim() || query.song,
+    artistName: cleanArtist(payload.track?.artist?.trim() || query.artist),
+    instrumental: Boolean(payload.meta?.instrumental),
+    synced,
+    lines,
+    source: payload.meta?.source?.name || 'lyrics search',
+    sourceUrl: 'https://lrcmux.dev/',
+    duration: payload.track?.duration && payload.track.duration > 0 ? payload.track.duration : 0,
+    albumName: payload.track?.album?.trim() || '',
+    matchesVideo: false,
+  };
+}
+
 async function searchLyricsOvh(query: SongQuery): Promise<Lyrics | null> {
   if (!query.artist || !query.song) return null;
   const response = await fetch(
@@ -200,6 +238,21 @@ export async function fetchLyrics(videoTitle: string, videoArtist: string, durat
       const candidate = { lyrics, rank: best.rank };
       if (preferCandidate(candidate, winner, duration)) winner = candidate;
       if (winner?.lyrics.matchesVideo && winner.rank >= 8) return { status: 'found', lyrics: winner.lyrics };
+    } catch {
+      sawFailure = true;
+    }
+  }
+
+  if (winner) return { status: 'found', lyrics: applyVideoTiming(winner.lyrics, duration) };
+
+  const muxQueries = queries.filter((query) => query.artist && query.song).slice(0, 4);
+  for (const query of muxQueries) {
+    try {
+      const found = await searchMux(query);
+      if (!found) continue;
+      const candidate = { lyrics: applyVideoTiming(found, duration), rank: found.synced ? 8 : 5 };
+      if (preferCandidate(candidate, winner, duration)) winner = candidate;
+      if (winner?.lyrics.matchesVideo) return { status: 'found', lyrics: winner.lyrics };
     } catch {
       sawFailure = true;
     }
