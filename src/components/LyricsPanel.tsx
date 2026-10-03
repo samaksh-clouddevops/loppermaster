@@ -62,11 +62,21 @@ export function LyricsPanel() {
       )}
       <LyricsBody result={result} lines={lines} activeIndex={activeIndex} scroller={scroller} />
       <p className="rate-note">
-        Lyrics from{' '}
-        <a href="https://lrclib.net/" target="_blank" rel="noreferrer">
-          LRCLIB
-        </a>
-        . Click a timed line to jump the video there.
+        {result.status === 'found' ? (
+          <>
+            Lyrics from{' '}
+            <a href={result.lyrics.sourceUrl} target="_blank" rel="noreferrer">
+              {result.lyrics.source}
+            </a>
+            .
+          </>
+        ) : (
+          <>
+            Lyrics from <a href="https://lrclib.net/" target="_blank" rel="noreferrer">LRCLIB</a>, then{' '}
+            <a href="https://lyrics.ovh/" target="_blank" rel="noreferrer">lyrics.ovh</a> if needed.
+          </>
+        )}{' '}
+        Click a timed line to jump the video there.
       </p>
       </section>
     </div>

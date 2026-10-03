@@ -1,4 +1,4 @@
-import { practiceQuery } from './songQuery';
+import { practiceQueries } from './songQuery';
 
 export interface SongMatch {
   id: string;
@@ -102,12 +102,11 @@ function score(song: RawSong, artist: string, title: string) {
   return value;
 }
 
-export async function lookupSong(apiKey: string, videoTitle: string, videoArtist: string): Promise<LookupResult> {
-  const query = practiceQuery(videoTitle, videoArtist);
-  const lookup = query.artist ? `artist:${query.artist} song:${query.song}` : query.song;
+async function searchCatalog(apiKey: string, artist: string, song: string): Promise<LookupResult> {
+  const lookup = artist ? `artist:${artist} song:${song}` : song;
   const params = new URLSearchParams({
     api_key: apiKey,
-    type: query.artist ? 'both' : 'song',
+    type: artist ? 'both' : 'song',
     lookup,
     limit: '5',
   });
@@ -123,9 +122,20 @@ export async function lookupSong(apiKey: string, videoTitle: string, videoArtist
   if (payload.error?.toLowerCase().includes('api key')) return { status: 'invalid-key' };
   const songs = Array.isArray(payload.search) ? payload.search : [];
   const ranked = songs
-    .map((song) => ({ song, match: toMatch(song), rank: score(song, query.artist, query.song) }))
-    .filter((item): item is { song: RawSong; match: SongMatch; rank: number } => item.match !== null)
+    .map((item) => ({ item, match: toMatch(item), rank: score(item, artist, song) }))
+    .filter((entry): entry is { item: RawSong; match: SongMatch; rank: number } => entry.match !== null)
     .sort((a, b) => b.rank - a.rank);
   const best = ranked[0]?.match;
   return best ? { status: 'found', match: best } : { status: 'empty' };
+}
+
+export async function lookupSong(apiKey: string, videoTitle: string, videoArtist: string): Promise<LookupResult> {
+  const queries = practiceQueries(videoTitle, videoArtist);
+  let failed = false;
+  for (const query of queries) {
+    const result = await searchCatalog(apiKey, query.artist, query.song);
+    if (result.status === 'found' || result.status === 'invalid-key') return result;
+    if (result.status === 'failed') failed = true;
+  }
+  return failed ? { status: 'failed' } : { status: 'empty' };
 }

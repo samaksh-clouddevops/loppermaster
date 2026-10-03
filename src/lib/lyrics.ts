@@ -1,4 +1,4 @@
-import { practiceQuery } from './songQuery';
+import { practiceQueries, type SongQuery } from './songQuery';
 
 export interface LyricLine {
   time: number | null;
@@ -11,6 +11,8 @@ export interface Lyrics {
   instrumental: boolean;
   synced: boolean;
   lines: LyricLine[];
+  source: string;
+  sourceUrl: string;
 }
 
 export type LyricsResult = { status: 'found'; lyrics: Lyrics } | { status: 'empty' } | { status: 'failed' };
@@ -91,7 +93,77 @@ function toLyrics(item: RawLyrics): Lyrics | null {
     instrumental: Boolean(item.instrumental),
     synced: syncedLines.length > 0,
     lines,
+    source: 'LRCLIB',
+    sourceUrl: item.id ? `https://lrclib.net/tracks/${item.id}` : 'https://lrclib.net/',
   };
+}
+
+async function searchLrcLib(query: SongQuery): Promise<RawLyrics[]> {
+  const params = new URLSearchParams({ track_name: query.song });
+  if (query.artist) params.set('artist_name', query.artist);
+  const response = await fetch(`https://lrclib.net/api/search?${params.toString()}`);
+  if (!response.ok) return [];
+  const payload: unknown = await response.json();
+  return Array.isArray(payload) ? (payload as RawLyrics[]) : [];
+}
+
+async function searchLyricsOvh(query: SongQuery): Promise<Lyrics | null> {
+  if (!query.artist || !query.song) return null;
+  const response = await fetch(
+    `https://api.lyrics.ovh/v1/${encodeURIComponent(query.artist)}/${encodeURIComponent(query.song)}`,
+  );
+  if (!response.ok) return null;
+  const payload = (await response.json()) as { lyrics?: string; error?: string };
+  const text = payload.lyrics?.trim();
+  if (!text) return null;
+  const lines = parsePlain(text);
+  if (lines.length === 0) return null;
+  return {
+    trackName: query.song,
+    artistName: query.artist,
+    instrumental: false,
+    synced: false,
+    lines,
+    source: 'lyrics.ovh',
+    sourceUrl: 'https://lyrics.ovh/',
+  };
+}
+
+function bestFrom(results: RawLyrics[], query: SongQuery, duration: number) {
+  return results
+    .map((item) => ({ lyrics: toLyrics(item), rank: score(item, query.song, query.artist, duration) }))
+    .filter((entry): entry is { lyrics: Lyrics; rank: number } => entry.lyrics !== null)
+    .sort((a, b) => b.rank - a.rank)[0];
+}
+
+export async function fetchLyrics(videoTitle: string, videoArtist: string, duration: number): Promise<LyricsResult> {
+  const queries = practiceQueries(videoTitle, videoArtist);
+  let winner: { lyrics: Lyrics; rank: number } | undefined;
+  let sawFailure = false;
+
+  for (const query of queries) {
+    try {
+      const results = await searchLrcLib(query);
+      const best = bestFrom(results, query, duration);
+      if (best && (!winner || best.rank > winner.rank)) winner = best;
+      if (winner && winner.rank >= 8) return { status: 'found', lyrics: winner.lyrics };
+    } catch {
+      sawFailure = true;
+    }
+  }
+
+  if (winner) return { status: 'found', lyrics: winner.lyrics };
+
+  for (const query of queries) {
+    try {
+      const plain = await searchLyricsOvh(query);
+      if (plain) return { status: 'found', lyrics: plain };
+    } catch {
+      sawFailure = true;
+    }
+  }
+
+  return sawFailure ? { status: 'failed' } : { status: 'empty' };
 }
 
 export function lineAtTime(lines: LyricLine[], seconds: number) {
@@ -103,28 +175,4 @@ export function lineAtTime(lines: LyricLine[], seconds: number) {
     else break;
   }
   return active;
-}
-
-export async function fetchLyrics(videoTitle: string, videoArtist: string, duration: number): Promise<LyricsResult> {
-  const query = practiceQuery(videoTitle, videoArtist);
-  const params = new URLSearchParams({ track_name: query.song });
-  if (query.artist) params.set('artist_name', query.artist);
-
-  let payload: unknown;
-  try {
-    const response = await fetch(`https://lrclib.net/api/search?${params.toString()}`);
-    if (!response.ok) return response.status === 404 ? { status: 'empty' } : { status: 'failed' };
-    payload = await response.json();
-  } catch {
-    return { status: 'failed' };
-  }
-
-  const results = Array.isArray(payload) ? (payload as RawLyrics[]) : [];
-  const best = results
-    .map((item) => ({ item, rank: score(item, query.song, query.artist, duration) }))
-    .sort((a, b) => b.rank - a.rank)
-    .map((entry) => toLyrics(entry.item))
-    .find((lyrics) => lyrics !== null);
-
-  return best ? { status: 'found', lyrics: best } : { status: 'empty' };
 }
