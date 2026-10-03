@@ -47,7 +47,10 @@ function Session({ active }: { active: boolean }) {
         {author ? <p className="session-author">{author}</p> : status === 'loading' && <div className="skeleton skeleton-author" />}
       </div>
       <div className="stage" ref={stageRef} aria-busy={status === 'loading'}>
-        <VideoPlayer />
+        <div className="watch">
+          <VideoPlayer />
+          {ready ? <LyricsPanel /> : <div className="lyrics-slot" aria-hidden="true"><div className="panel lyrics-panel lyrics-pending" /></div>}
+        </div>
         {ready && (
           <>
             <PlaybackControls stageRef={stageRef} />
@@ -70,7 +73,6 @@ function Session({ active }: { active: boolean }) {
             <CurrentLoopCard />
           </div>
           <TempoPanel />
-          <LyricsPanel />
           <p className="hint">
             <span>
               <kbd>Space</kbd> play

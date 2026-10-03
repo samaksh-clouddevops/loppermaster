@@ -48,7 +48,8 @@ export function LyricsPanel() {
   }, [activeIndex]);
 
   return (
-    <section className="panel lyrics-panel" aria-labelledby="lyrics-label">
+    <div className="lyrics-slot">
+      <section className="panel lyrics-panel" aria-labelledby="lyrics-label">
       <div className="tempo-head">
         <h2 id="lyrics-label">Lyrics</h2>
         {result.status === 'found' && result.lyrics.synced && <span className="transport-status">Follows video</span>}
@@ -67,7 +68,8 @@ export function LyricsPanel() {
         </a>
         . Click a timed line to jump the video there.
       </p>
-    </section>
+      </section>
+    </div>
   );
 }
 
