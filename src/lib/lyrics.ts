@@ -14,6 +14,8 @@ export interface Lyrics {
   source: string;
   sourceUrl: string;
   duration: number;
+  albumName: string;
+  matchesVideo: boolean;
 }
 
 export type LyricsResult = { status: 'found'; lyrics: Lyrics } | { status: 'empty' } | { status: 'failed' };
@@ -22,6 +24,7 @@ interface RawLyrics {
   id?: number;
   trackName?: string;
   artistName?: string;
+  albumName?: string;
   duration?: number;
   instrumental?: boolean;
   plainLyrics?: string | null;
@@ -95,6 +98,8 @@ function toLyrics(item: RawLyrics): Lyrics | null {
     source: 'LRCLIB',
     sourceUrl: item.id ? `https://lrclib.net/tracks/${item.id}` : 'https://lrclib.net/',
     duration: item.duration && item.duration > 0 ? item.duration : 0,
+    albumName: item.albumName?.trim() || '',
+    matchesVideo: false,
   };
 }
 
@@ -127,14 +132,58 @@ async function searchLyricsOvh(query: SongQuery): Promise<Lyrics | null> {
     source: 'lyrics.ovh',
     sourceUrl: 'https://lyrics.ovh/',
     duration: 0,
+    albumName: '',
+    matchesVideo: false,
   };
 }
 
 function bestFrom(results: RawLyrics[], query: SongQuery, duration: number) {
-  return results
+  const ranked = results
     .map((item) => ({ lyrics: toLyrics(item), rank: score(item, query.song, query.artist, duration) }))
-    .filter((entry): entry is { lyrics: Lyrics; rank: number } => entry.lyrics !== null)
-    .sort((a, b) => b.rank - a.rank)[0];
+    .filter((entry): entry is { lyrics: Lyrics; rank: number } => entry.lyrics !== null);
+  if (duration > 0) {
+    ranked.sort((a, b) => {
+      const aDelta = a.lyrics.duration > 0 ? Math.abs(a.lyrics.duration - duration) : Number.POSITIVE_INFINITY;
+      const bDelta = b.lyrics.duration > 0 ? Math.abs(b.lyrics.duration - duration) : Number.POSITIVE_INFINITY;
+      if (Math.abs(aDelta - bDelta) > 1) return aDelta - bDelta;
+      return b.rank - a.rank;
+    });
+  } else {
+    ranked.sort((a, b) => b.rank - a.rank);
+  }
+  return ranked[0];
+}
+
+export function timingsMatch(lyricDuration: number, videoDuration: number) {
+  if (lyricDuration <= 0 || videoDuration <= 0) return false;
+  return Math.abs(lyricDuration - videoDuration) <= Math.max(4, videoDuration * 0.02);
+}
+
+export function versionSearchUrl(artist: string, title: string, album: string) {
+  const query = [artist, title, album].filter(Boolean).join(' ');
+  return `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+}
+
+function preferCandidate(
+  candidate: { lyrics: Lyrics; rank: number },
+  current: { lyrics: Lyrics; rank: number } | undefined,
+  videoDuration: number,
+) {
+  if (!current) return true;
+  if (videoDuration <= 0) return candidate.rank > current.rank;
+  const candidateDelta = candidate.lyrics.duration > 0 ? Math.abs(candidate.lyrics.duration - videoDuration) : Number.POSITIVE_INFINITY;
+  const currentDelta = current.lyrics.duration > 0 ? Math.abs(current.lyrics.duration - videoDuration) : Number.POSITIVE_INFINITY;
+  if (Math.abs(candidateDelta - currentDelta) > 1) return candidateDelta < currentDelta;
+  return candidate.rank > current.rank;
+}
+
+function applyVideoTiming(lyrics: Lyrics, videoDuration: number) {
+  if (videoDuration <= 0) {
+    lyrics.matchesVideo = lyrics.synced;
+    return lyrics;
+  }
+  lyrics.matchesVideo = lyrics.synced && timingsMatch(lyrics.duration, videoDuration);
+  return lyrics;
 }
 
 export async function fetchLyrics(videoTitle: string, videoArtist: string, duration: number): Promise<LyricsResult> {
@@ -146,16 +195,17 @@ export async function fetchLyrics(videoTitle: string, videoArtist: string, durat
     try {
       const results = await searchLrcLib(query);
       const best = bestFrom(results, query, duration);
-      if (best && (!winner || best.rank > winner.rank)) winner = best;
-      if (winner && winner.rank >= 8 && durationClose(winner.lyrics.duration, duration)) {
-        return { status: 'found', lyrics: winner.lyrics };
-      }
+      if (!best) continue;
+      const lyrics = applyVideoTiming(best.lyrics, duration);
+      const candidate = { lyrics, rank: best.rank };
+      if (preferCandidate(candidate, winner, duration)) winner = candidate;
+      if (winner?.lyrics.matchesVideo && winner.rank >= 8) return { status: 'found', lyrics: winner.lyrics };
     } catch {
       sawFailure = true;
     }
   }
 
-  if (winner) return { status: 'found', lyrics: winner.lyrics };
+  if (winner) return { status: 'found', lyrics: applyVideoTiming(winner.lyrics, duration) };
 
   for (const query of queries) {
     try {
@@ -179,9 +229,4 @@ export function lineAtTime(lines: LyricLine[], seconds: number, offset = 0) {
     else break;
   }
   return active;
-}
-
-function durationClose(lyricDuration: number, videoDuration: number) {
-  if (lyricDuration <= 0 || videoDuration <= 0) return true;
-  return Math.abs(lyricDuration - videoDuration) <= 8;
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import { fetchLyrics, lineAtTime, type LyricLine, type LyricsResult } from '../lib/lyrics';
+import { fetchLyrics, lineAtTime, versionSearchUrl, type LyricLine, type LyricsResult } from '../lib/lyrics';
 import { formatTime } from '../lib/time';
 import { seekTo, store } from '../state/store';
 import { usePracticeState } from '../state/hooks';
@@ -11,7 +11,7 @@ export function LyricsPanel() {
   const [offset, setOffset] = useState(0);
   const scroller = useRef<HTMLDivElement>(null);
   const lines = result.status === 'found' ? result.lyrics.lines : [];
-  const synced = result.status === 'found' && result.lyrics.synced;
+  const follows = result.status === 'found' && result.lyrics.matchesVideo;
 
   useEffect(() => {
     if (!videoId) return;
@@ -38,7 +38,7 @@ export function LyricsPanel() {
   }, [author, duration, status, videoId, videoTitle]);
 
   useEffect(() => {
-    if (result.status !== 'found' || !result.lyrics.synced) return;
+    if (result.status !== 'found' || !result.lyrics.matchesVideo) return;
     const lyricLines = result.lyrics.lines;
     const update = () => {
       const next = lineAtTime(lyricLines, store.getState().currentTime, offset);
@@ -66,9 +66,12 @@ export function LyricsPanel() {
       <section className="panel lyrics-panel" aria-labelledby="lyrics-label">
       <div className="tempo-head">
         <h2 id="lyrics-label">Lyrics</h2>
-        {synced && <span className="transport-status">Follows video</span>}
+        {follows && <span className="transport-status">Follows video</span>}
+        {result.status === 'found' && result.lyrics.synced && !result.lyrics.matchesVideo && (
+          <span className="transport-status timing-differs">Different version</span>
+        )}
       </div>
-      {synced && (
+      {follows && (
         <div className="lyric-sync">
           <button
             className="btn lyric-nudge"
@@ -134,9 +137,20 @@ export function LyricsPanel() {
             <a href="https://lyrics.ovh/" target="_blank" rel="noreferrer">lyrics.ovh</a> if needed.
           </>
         )}{' '}
-        {synced && result.status === 'found' && result.lyrics.duration > 0 && duration > 0 && Math.abs(result.lyrics.duration - duration) > 3
-          ? `Timed to a ${formatTime(result.lyrics.duration)} recording. This video is ${formatTime(duration)}. `
-          : ''}
+        {result.status === 'found' && result.lyrics.synced && !result.lyrics.matchesVideo && duration > 0 && (
+          <>
+            These timings match {result.lyrics.albumName ? `“${result.lyrics.albumName}”` : 'another recording'} (
+            {formatTime(result.lyrics.duration)}), not this {formatTime(duration)} video.{' '}
+            <a
+              href={versionSearchUrl(result.lyrics.artistName, result.lyrics.trackName, result.lyrics.albumName)}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Find that version
+            </a>
+            .{' '}
+          </>
+        )}
         Click a timed line to jump the video there.
       </p>
       </section>

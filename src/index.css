@@ -1589,6 +1589,11 @@ body.tour-open {
   color: var(--color-accent-strong);
 }
 
+.timing-differs {
+  background: #f59e0b;
+  color: #1a1203;
+}
+
 .lyric-sync {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
