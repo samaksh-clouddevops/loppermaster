@@ -415,6 +415,25 @@ button:disabled {
   font-weight: 600;
 }
 
+.studio {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.video-fit {
+  min-width: 0;
+}
+
+.lyrics-slot {
+  min-width: 0;
+  min-height: 0;
+}
+
+.lyrics-pending {
+  min-height: 180px;
+}
+
 .stage {
   display: grid;
   gap: 14px;
@@ -1168,63 +1187,122 @@ kbd {
   align-items: center;
 }
 
-.watch {
-  display: grid;
-  gap: 16px;
-  align-items: stretch;
-}
-
-.lyrics-slot {
-  min-width: 0;
-  min-height: 0;
-}
-
-.lyrics-pending {
-  min-height: 180px;
-}
-
-.stage:fullscreen,
-.stage:-webkit-full-screen {
+.studio:fullscreen,
+.studio:-webkit-full-screen {
   background: var(--color-background);
   padding: 20px;
   overflow: auto;
   box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 340px);
+  gap: 12px;
+  align-items: start;
+}
+
+.studio:fullscreen .stage,
+.studio:-webkit-full-screen .stage,
+.studio:fullscreen .rail,
+.studio:-webkit-full-screen .rail {
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-
-.stage:fullscreen .watch,
-.stage:-webkit-full-screen .watch {
-  grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
   min-height: 0;
+  height: auto;
 }
 
-.stage:fullscreen .player-frame,
-.stage:-webkit-full-screen .player-frame {
-  max-height: calc(100vh - 240px);
+.studio:fullscreen .video-fit,
+.studio:-webkit-full-screen .video-fit {
+  height: auto;
+  container-type: normal;
+}
+
+.studio:fullscreen .player-frame,
+.studio:-webkit-full-screen .player-frame {
+  max-height: calc(100vh - 280px);
+}
+
+@media (max-width: 959px) {
+  .stage,
+  .rail {
+    display: contents;
+  }
+
+  .video-fit {
+    order: 1;
+  }
+
+  .lyrics-slot {
+    order: 2;
+  }
+
+  .skeleton-stack {
+    order: 3;
+  }
+
+  .transport {
+    order: 4;
+  }
+
+  .timeline {
+    order: 5;
+  }
+
+  .loop-actions {
+    order: 6;
+  }
+
+  .practice-grid {
+    order: 7;
+  }
+
+  .tempo-panel,
+  .rail > .skeleton {
+    order: 8;
+  }
+
+  .hint {
+    order: 9;
+  }
+
+  .lyrics-scroll {
+    max-height: min(42vh, 320px);
+  }
 }
 
 @media (min-width: 960px) {
-  .watch {
-    grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  .studio {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
+    align-items: start;
+    gap: 16px;
+  }
+
+  .practice-grid,
+  .hint {
+    grid-column: 1 / -1;
+  }
+
+  .rail {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
   }
 
   .lyrics-slot {
     position: relative;
-    height: 100%;
+    min-height: 220px;
   }
 
-  .watch .lyrics-panel {
-    position: absolute;
-    inset: 0;
+  .rail .lyrics-panel {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    max-height: min(52vh, 460px);
     overflow: hidden;
   }
 
-  .watch .lyrics-scroll {
+  .rail .lyrics-scroll {
     flex: 1 1 auto;
     max-height: none;
     min-height: 0;
@@ -1240,12 +1318,6 @@ kbd {
     -webkit-line-clamp: 1;
     -webkit-box-orient: vertical;
     overflow: hidden;
-  }
-}
-
-@media (max-width: 959px) {
-  .lyrics-scroll {
-    max-height: min(42vh, 320px);
   }
 }
 
@@ -1274,7 +1346,362 @@ kbd {
 
 @media (min-width: 1440px) {
   .shell {
-    width: min(1320px, calc(100% - 64px));
+    width: min(1480px, calc(100% - 48px));
+  }
+}
+
+@media (min-width: 1024px) and (min-height: 700px) {
+  html,
+  body,
+  #root,
+  .app {
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  body {
+    min-height: 0;
+  }
+
+  .shell {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    width: min(1480px, calc(100% - 28px));
+    padding-bottom: 10px;
+  }
+
+  .header {
+    min-height: 48px;
+    flex: none;
+  }
+
+  #workspace {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+  }
+
+  [data-screen='practice'] {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+  }
+
+  .session {
+    height: 100%;
+    min-height: 0;
+    margin-top: 0;
+    gap: 8px;
+    overflow: hidden;
+    grid-template-rows: auto auto minmax(0, 1fr);
+  }
+
+  .session-head {
+    min-height: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .session-title {
+    font-size: 20px;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .session-author {
+    font-size: 13px;
+  }
+
+  .field,
+  .url-row .btn {
+    min-height: 40px;
+  }
+
+  .studio {
+    min-height: 0;
+    height: 100%;
+    align-items: stretch;
+    gap: 8px;
+    grid-template-rows: minmax(0, 1fr) auto auto;
+  }
+
+  .practice-grid,
+  .hint {
+    grid-column: 1 / -1;
+  }
+
+  .stage {
+    min-height: 0;
+    height: 100%;
+    grid-template-rows: minmax(0, 1fr) auto auto auto;
+    gap: 6px;
+    align-content: stretch;
+  }
+
+  .video-fit {
+    min-height: 0;
+    height: 100%;
+    container-type: size;
+    display: grid;
+    place-items: center;
+  }
+
+  .video-fit .player-frame {
+    width: min(100cqw, calc(100cqh * 16 / 9));
+    max-height: 100%;
+    height: auto;
+  }
+
+  .rail {
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) minmax(220px, 270px);
+    gap: 8px;
+    align-content: stretch;
+  }
+
+  .rail .lyrics-slot {
+    min-height: 0;
+    height: 100%;
+    position: relative;
+  }
+
+  .rail .lyrics-panel {
+    position: absolute;
+    inset: 0;
+    max-height: none;
+    overflow: hidden;
+  }
+
+  .rail .tempo-panel {
+    height: 100%;
+    min-height: 0;
+    max-height: none;
+    overflow: auto;
+    padding: 8px 10px;
+    gap: 4px;
+  }
+
+  .rail .tempo-head h2,
+  .rail .lyrics-panel h2 {
+    margin: 0;
+    font-size: 16px;
+  }
+
+  .rail .tempo-head .btn,
+  .rail .metro-row .btn {
+    min-height: 32px;
+    padding: 0 10px;
+  }
+
+  .rail .nudge {
+    width: 32px;
+    height: 32px;
+  }
+
+  .rail .tempo-stats {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    min-width: 0;
+  }
+
+  .rail .tempo-stats .stat,
+  .rail .tempo-head,
+  .rail .metro-row {
+    min-width: 0;
+  }
+
+  .rail .tempo-stats .rate-note {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .rail .click-volume {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .rail .click-volume .range {
+    width: 72px;
+  }
+
+  .rail .tempo-panel .rate-note,
+  .rail .tempo-panel .tempo-match {
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  .rail .scale-notes {
+    flex-wrap: nowrap;
+    margin-top: 4px;
+    gap: 4px;
+  }
+
+  .rail .metro-row {
+    flex-wrap: nowrap;
+  }
+
+  .rail .tempo-bpm strong,
+  .rail .tempo-key {
+    font-size: 22px;
+    margin-top: 0;
+  }
+
+  .rail .scale-notes li {
+    min-width: 0;
+    padding: 1px 4px;
+    font-size: 12px;
+  }
+
+  .rail .tempo-stats .rate-note {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .rail .lyrics-panel > .rate-note,
+  .rail .tempo-panel > .rate-note {
+    display: block;
+    flex: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-height: 18px;
+  }
+
+  .rail .lyric-line {
+    padding: 3px 8px;
+  }
+
+  .loop-stats {
+    display: none;
+  }
+
+  .rail .lyric-sync {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+  }
+
+  .rail .lyric-sync-readout {
+    grid-column: auto;
+    white-space: nowrap;
+  }
+
+  .play-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .track {
+    height: 72px;
+  }
+
+  .lane {
+    height: 44px;
+  }
+
+  .playhead {
+    top: 14px;
+  }
+
+  .handle-stem {
+    top: 20px;
+  }
+
+  .handle-knob {
+    top: 34px;
+  }
+
+  .panel {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+
+  .speed {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: 12px;
+  }
+
+  .speed-head,
+  .presets,
+  .speed .rate-note {
+    grid-column: 1 / -1;
+  }
+
+  .speed-readout {
+    grid-column: 1;
+    grid-row: 2 / span 2;
+  }
+
+  .speed-scale,
+  .speed .range {
+    grid-column: 2;
+  }
+
+  .speed .range,
+  .practice-grid .range {
+    height: 28px;
+  }
+
+  .practice-grid .nudge {
+    width: 36px;
+    height: 36px;
+  }
+
+  .preset {
+    min-height: 32px;
+  }
+
+  .speed-value {
+    font-size: 22px;
+  }
+
+  .loop-card-title {
+    font-size: 15px;
+    -webkit-line-clamp: 1;
+  }
+
+  .loop-range {
+    font-size: 14px;
+  }
+
+  .practice-grid .stat {
+    padding: 6px 8px;
+  }
+
+  .practice-grid .btn {
+    min-height: 36px;
+  }
+
+  .tempo-panel {
+    grid-column: auto;
+  }
+
+  .hint {
+    flex-wrap: nowrap;
+    overflow: hidden;
+    font-size: 12px;
+  }
+
+  .practice-grid {
+    gap: 8px;
+  }
+}
+
+@media (min-width: 1024px) and (min-height: 960px) {
+  .loop-stats {
+    display: grid;
   }
 }
 

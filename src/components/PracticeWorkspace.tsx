@@ -46,60 +46,62 @@ function Session({ active }: { active: boolean }) {
         )}
         {author ? <p className="session-author">{author}</p> : status === 'loading' && <div className="skeleton skeleton-author" />}
       </div>
-      <div className="stage" ref={stageRef} aria-busy={status === 'loading'}>
-        <div className="watch">
-          <VideoPlayer />
+      <div className="studio" ref={stageRef} aria-busy={status === 'loading'}>
+        <div className="stage">
+          <div className="video-fit">
+            <VideoPlayer />
+          </div>
+          {ready && (
+            <>
+              <PlaybackControls stageRef={stageRef} />
+              <PracticeTimeline />
+              <LoopControls />
+            </>
+          )}
+          {status === 'loading' && (
+            <div className="skeleton-stack" aria-hidden="true">
+              <div className="skeleton skeleton-transport" />
+              <div className="skeleton skeleton-timeline" />
+              <div className="skeleton skeleton-buttons" />
+            </div>
+          )}
+        </div>
+        <div className="rail">
           {ready ? <LyricsPanel /> : <div className="lyrics-slot" aria-hidden="true"><div className="panel lyrics-panel lyrics-pending" /></div>}
+          {ready && <TempoPanel />}
+          {status === 'loading' && <div className="skeleton skeleton-panel" aria-hidden="true" />}
         </div>
         {ready && (
           <>
-            <PlaybackControls stageRef={stageRef} />
-            <PracticeTimeline />
-            <LoopControls />
+            <div className="practice-grid">
+              <SpeedControl />
+              <CurrentLoopCard />
+            </div>
+            <p className="hint">
+              <span>
+                <kbd>Space</kbd> play
+              </span>
+              <span>
+                <kbd>A</kbd> set start
+              </span>
+              <span>
+                <kbd>B</kbd> set end
+              </span>
+              <span>
+                <kbd>L</kbd> loop
+              </span>
+              <span>
+                <kbd>←</kbd>
+                <kbd>→</kbd> seek
+              </span>
+              <span>
+                <kbd>−</kbd>
+                <kbd>+</kbd> speed
+              </span>
+            </p>
           </>
         )}
-        {status === 'loading' && (
-          <div className="skeleton-stack" aria-hidden="true">
-            <div className="skeleton skeleton-transport" />
-            <div className="skeleton skeleton-timeline" />
-            <div className="skeleton skeleton-buttons" />
-          </div>
-        )}
       </div>
-      {ready && (
-        <>
-          <div className="practice-grid">
-            <SpeedControl />
-            <CurrentLoopCard />
-          </div>
-          <TempoPanel />
-          <p className="hint">
-            <span>
-              <kbd>Space</kbd> play
-            </span>
-            <span>
-              <kbd>A</kbd> set start
-            </span>
-            <span>
-              <kbd>B</kbd> set end
-            </span>
-            <span>
-              <kbd>L</kbd> loop
-            </span>
-            <span>
-              <kbd>←</kbd>
-              <kbd>→</kbd> seek
-            </span>
-            <span>
-              <kbd>−</kbd>
-              <kbd>+</kbd> speed
-            </span>
-          </p>
-        </>
-      )}
-      {status === 'loading' && (
-        <div className="skeleton skeleton-panel" aria-hidden="true" />
-      )}
     </div>
   );
 }
