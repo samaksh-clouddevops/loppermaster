@@ -10,6 +10,7 @@ import { LoopControls } from './LoopControls';
 import { SpeedControl } from './SpeedControl';
 import { CurrentLoopCard } from './CurrentLoopCard';
 import { TempoPanel } from './TempoPanel';
+import { LyricsPanel } from './LyricsPanel';
 
 export function PracticeWorkspace() {
   const view = usePracticeState().view;
@@ -69,6 +70,7 @@ function Session({ active }: { active: boolean }) {
             <CurrentLoopCard />
           </div>
           <TempoPanel />
+          <LyricsPanel />
           <p className="hint">
             <span>
               <kbd>Space</kbd> play
