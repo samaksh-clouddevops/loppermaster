@@ -10,11 +10,21 @@ function tidy(value: string) {
 }
 
 function stripNoise(title: string) {
-  return tidy(
-    title
-      .replace(/\s*[([].*?[)\]]/g, (chunk) => (NOISE.test(chunk) ? '' : chunk))
-      .replace(/\s+[-–—|]\s+official\b.*$/i, ''),
-  );
+  const phrases = [
+    /\bfull\s+audio\s+songs?\b/gi,
+    /\bfull\s+video\s+songs?\b/gi,
+    /\baudio\s+songs?\b/gi,
+    /\bvideo\s+songs?\b/gi,
+    /\blyrical(?:\s+video)?\b/gi,
+    /\bofficial\s+audio\b/gi,
+    /\bofficial\s+video\b/gi,
+    /\bfull\s+audio\b/gi,
+    /\bfull\s+video\b/gi,
+    /\bfull\s+songs?\b/gi,
+  ];
+  let value = title.replace(/\s*[([].*?[)\]]/g, (chunk) => (NOISE.test(chunk) ? '' : chunk));
+  for (const phrase of phrases) value = value.replace(phrase, ' ');
+  return tidy(value.replace(/\s+[-–—|]\s+official\b.*$/i, ''));
 }
 
 function cleanChannel(artist: string) {
@@ -40,13 +50,23 @@ export function practiceQueries(title: string, artist: string): SongQuery[] {
     queries.push({ artist: artistName, song });
   };
 
-  const parts = cleanedTitle.split(/\s+[-–—]\s+/);
-  if (parts.length >= 2) {
+  const addDashSplit = (value: string) => {
+    const parts = value.split(/\s+[-–—]\s+/);
+    if (parts.length < 2) return;
     const titleArtist = parts[0];
     const song = parts.slice(1).join(' - ');
     push(titleArtist, song);
     push(channel, song);
     push('', song);
+  };
+
+  if (cleanedTitle.includes('|')) {
+    const lead = tidy(cleanedTitle.split('|')[0] ?? '');
+    push('', lead);
+    push(channel, lead);
+    addDashSplit(lead);
+  } else {
+    addDashSplit(cleanedTitle);
   }
 
   push(channel, cleanedTitle);
