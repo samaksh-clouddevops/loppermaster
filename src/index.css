@@ -1465,7 +1465,7 @@ kbd {
     height: 100%;
     overflow: hidden;
     display: grid;
-    grid-template-rows: minmax(0, 1fr) minmax(220px, 270px);
+    grid-template-rows: minmax(0, 1fr) auto;
     gap: 8px;
     align-content: stretch;
   }
@@ -1484,12 +1484,17 @@ kbd {
   }
 
   .rail .tempo-panel {
-    height: 100%;
+    height: auto;
     min-height: 0;
-    max-height: none;
-    overflow: auto;
+    overflow: visible;
     padding: 8px 10px;
     gap: 4px;
+  }
+
+  .rail .tempo-match,
+  .rail .tempo-stats .rate-note,
+  .rail .tempo-panel > .rate-note {
+    display: none;
   }
 
   .rail .tempo-head h2,
@@ -1554,8 +1559,12 @@ kbd {
 
   .rail .tempo-bpm strong,
   .rail .tempo-key {
-    font-size: 22px;
+    font-size: 18px;
     margin-top: 0;
+  }
+
+  .rail .tempo-stats .stat {
+    padding: 4px 6px;
   }
 
   .rail .scale-notes li {
@@ -1570,8 +1579,7 @@ kbd {
     text-overflow: ellipsis;
   }
 
-  .rail .lyrics-panel > .rate-note,
-  .rail .tempo-panel > .rate-note {
+  .rail .lyrics-panel > .rate-note {
     display: block;
     flex: none;
     white-space: nowrap;
@@ -1584,8 +1592,35 @@ kbd {
     padding: 3px 8px;
   }
 
-  .loop-stats {
+  .loop-stats,
+  .loop-card-title {
     display: none;
+  }
+
+  .practice-grid {
+    align-items: start;
+  }
+
+  .loop-card {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 12px;
+    padding: 6px 10px;
+  }
+
+  .loop-card .section-label {
+    margin: 0;
+    white-space: nowrap;
+  }
+
+  .loop-card .save-row {
+    margin-left: auto;
+  }
+
+  .loop-card .btn {
+    min-height: 32px;
+    padding: 0 12px;
   }
 
   .rail .lyric-sync {
@@ -1696,12 +1731,6 @@ kbd {
 
   .practice-grid {
     gap: 8px;
-  }
-}
-
-@media (min-width: 1024px) and (min-height: 960px) {
-  .loop-stats {
-    display: grid;
   }
 }
 
