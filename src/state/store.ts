@@ -212,7 +212,7 @@ export function submitUrl(raw = store.getState().inputValue) {
 
 export async function loadLocalFile(file: File, options: LoadOptions & { mediaId?: string } = {}) {
   if (!isSupportedAudioFile(file)) {
-    store.set({ inputError: 'Choose an MP3 or WAV file.' });
+    store.set({ inputError: 'Choose an MP3, WAV, or FLAC file.' });
     return;
   }
 
@@ -275,7 +275,7 @@ export async function openLocalMedia(videoId: string, options: LoadOptions = {})
         localFileName: '',
         inputValue: '',
         status: 'error',
-        playerError: 'Open the original MP3 or WAV file again to practice this loop.',
+        playerError: 'Open the original MP3, WAV, or FLAC file again to practice this loop.',
         videoTitle: options.title || 'Local audio',
         author: options.author || 'Local file',
         isPlaying: false,

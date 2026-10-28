@@ -11,7 +11,7 @@ function pickAudioFile(files: FileList | null | undefined) {
 function openDroppedAudio(files: FileList | null | undefined) {
   const file = pickAudioFile(files);
   if (!file) {
-    store.set({ inputError: 'Drop an MP3 or WAV file.' });
+    store.set({ inputError: 'Drop an MP3, WAV, or FLAC file.' });
     return;
   }
   void loadLocalFile(file);
@@ -121,7 +121,7 @@ export function VideoLoader({ prominent = false }: { prominent?: boolean }) {
             className="field"
             value={inputValue}
             onChange={(event) => setInputValue(event.target.value)}
-            placeholder="Paste a YouTube URL, or drop an MP3 / WAV"
+            placeholder="Paste a YouTube URL, or drop an MP3 / WAV / FLAC"
             autoCapitalize="off"
             autoCorrect="off"
             spellCheck={false}
@@ -139,19 +139,19 @@ export function VideoLoader({ prominent = false }: { prominent?: boolean }) {
             ref={fileRef}
             className="sr-only"
             type="file"
-            accept="audio/mpeg,audio/mp3,audio/wav,audio/wave,audio/x-wav,.mp3,.wav"
+            accept="audio/mpeg,audio/mp3,audio/wav,audio/wave,audio/x-wav,audio/flac,audio/x-flac,.mp3,.wav,.flac"
             onChange={onPickFile}
           />
         </div>
       </form>
       {dragging && (
         <p className="url-drop-hint" role="status">
-          Drop MP3 or WAV to practice
+          Drop MP3, WAV, or FLAC to practice
         </p>
       )}
       {prominent && !inputError && !dragging && (
         <p id="url-help" className="url-help">
-          Paste a YouTube URL, or drag in an MP3 / WAV for clearer slow practice.
+          Paste a YouTube URL, or drag in an MP3 / WAV / FLAC for clearer slow practice.
         </p>
       )}
       {!prominent && mediaSource === 'local' && !inputError && !dragging && (

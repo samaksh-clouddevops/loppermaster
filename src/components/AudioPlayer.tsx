@@ -22,7 +22,7 @@ export function AudioPlayer() {
         <div className="player-overlay">
           <div className="player-message" role="alert">
             <h2>{playerError}</h2>
-            <p>Choose the MP3 or WAV file again to keep practicing at high quality.</p>
+            <p>Choose the MP3, WAV, or FLAC file again to keep practicing at high quality.</p>
             <button className="btn btn-primary" type="button" onClick={retryVideo}>
               Try again
             </button>

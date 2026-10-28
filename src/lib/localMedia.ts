@@ -19,10 +19,25 @@ export function titleFromFileName(name: string) {
 export function isSupportedAudioFile(file: File) {
   const type = file.type.toLowerCase();
   const name = file.name.toLowerCase();
-  if (type === 'audio/mpeg' || type === 'audio/mp3' || type === 'audio/wav' || type === 'audio/wave' || type === 'audio/x-wav') {
+  if (
+    type === 'audio/mpeg' ||
+    type === 'audio/mp3' ||
+    type === 'audio/wav' ||
+    type === 'audio/wave' ||
+    type === 'audio/x-wav' ||
+    type === 'audio/flac' ||
+    type === 'audio/x-flac'
+  ) {
     return true;
   }
-  return name.endsWith('.mp3') || name.endsWith('.wav');
+  return name.endsWith('.mp3') || name.endsWith('.wav') || name.endsWith('.flac');
+}
+
+export function mimeFromFileName(name: string) {
+  const lower = name.toLowerCase();
+  if (lower.endsWith('.wav')) return 'audio/wav';
+  if (lower.endsWith('.flac')) return 'audio/flac';
+  return 'audio/mpeg';
 }
 
 function openDb(): Promise<IDBDatabase> {
@@ -45,7 +60,7 @@ export async function saveLocalMedia(id: string, file: File) {
       {
         id,
         name: file.name,
-        type: file.type || (file.name.toLowerCase().endsWith('.wav') ? 'audio/wav' : 'audio/mpeg'),
+        type: file.type || mimeFromFileName(file.name),
         blob: file,
         savedAt: Date.now(),
       },

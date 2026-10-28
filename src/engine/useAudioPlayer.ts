@@ -158,7 +158,7 @@ export function useAudioPlayer(objectUrl: string | null, mediaId: string | null,
 
     const onError = () => {
       if (cancelled || store.getState().videoId !== mediaId) return;
-      markError('We could not play that audio file. Try another MP3 or WAV.');
+      markError('We could not play that audio file. Try another MP3, WAV, or FLAC.');
     };
 
     audio.addEventListener('loadedmetadata', onReady);
