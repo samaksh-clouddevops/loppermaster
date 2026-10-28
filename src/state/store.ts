@@ -1,4 +1,12 @@
 import { formatTime } from '../lib/time';
+import {
+  createLocalMediaId,
+  isLocalMediaId,
+  isSupportedAudioFile,
+  loadLocalMedia,
+  saveLocalMedia,
+  titleFromFileName,
+} from '../lib/localMedia';
 import { canonicalWatchUrl, parseYouTubeId } from '../lib/youtube';
 import {
   loadHistory,
@@ -47,7 +55,10 @@ function readInitial(): PracticeState {
     walkthroughOpen: false,
     inputValue: videoId ? canonicalWatchUrl(videoId) : '',
     inputError: null,
+    mediaSource: 'youtube',
     videoId,
+    objectUrl: null,
+    localFileName: '',
     videoTitle: '',
     author: '',
     thumbnailUrl: '',
@@ -119,16 +130,23 @@ export function getEngine() {
   return engine;
 }
 
+function revokeObjectUrl(url: string | null) {
+  if (url) URL.revokeObjectURL(url);
+}
+
 function syncUrl() {
   const state = store.getState();
   if (!state.videoId) return;
   const params = new URLSearchParams();
-  params.set('v', state.videoId);
+  if (state.mediaSource === 'youtube' && !isLocalMediaId(state.videoId)) {
+    params.set('v', state.videoId);
+  }
   params.set('a', state.loopStart.toFixed(1));
   params.set('b', state.loopEnd.toFixed(1));
   params.set('r', state.playbackRate.toFixed(2));
   if (state.loopEnabled) params.set('loop', '1');
-  const next = `${window.location.pathname}?${params.toString()}`;
+  const query = params.toString();
+  const next = query ? `${window.location.pathname}?${query}` : window.location.pathname;
   const current = `${window.location.pathname}${window.location.search}`;
   if (next !== current) window.history.replaceState(null, '', next);
 }
@@ -171,6 +189,91 @@ export function submitUrl(raw = store.getState().inputValue) {
     return;
   }
   loadVideo(videoId, { force: true });
+}
+
+export async function loadLocalFile(file: File, options: LoadOptions & { mediaId?: string } = {}) {
+  if (!isSupportedAudioFile(file)) {
+    store.set({ inputError: 'Choose an MP3 or WAV file.' });
+    return;
+  }
+
+  const previousUrl = store.getState().objectUrl;
+  const videoId = options.mediaId && isLocalMediaId(options.mediaId) ? options.mediaId : createLocalMediaId();
+  const objectUrl = URL.createObjectURL(file);
+  const title = options.title || titleFromFileName(file.name);
+  const playbackRate = clamp(roundRate(options.rate ?? store.getState().playbackRate), MIN_RATE, MAX_RATE);
+
+  try {
+    await saveLocalMedia(videoId, file);
+  } catch {
+    /* Practice still works for this session even if IndexedDB is unavailable. */
+  }
+
+  store.set({
+    view: 'practice',
+    mediaSource: 'local',
+    videoId,
+    objectUrl,
+    localFileName: file.name,
+    inputValue: file.name,
+    inputError: null,
+    playerError: null,
+    videoTitle: title,
+    author: options.author || 'Local file',
+    thumbnailUrl: '',
+    duration: 0,
+    currentTime: options.start ?? 0,
+    loopStart: options.start ?? 0,
+    loopEnd: options.end ?? 0,
+    loopEnabled: options.loop ?? false,
+    playbackRate,
+    appliedRate: playbackRate,
+    fineRateSupported: true,
+    availableRates: [],
+    rateNotice: null,
+    isPlaying: false,
+    status: 'loading',
+    loadToken: store.getState().loadToken + 1,
+  });
+  revokeObjectUrl(previousUrl);
+  document.title = `${title} — Loopmaster`;
+  syncUrl();
+}
+
+export async function openLocalMedia(videoId: string, options: LoadOptions = {}) {
+  if (!isLocalMediaId(videoId)) {
+    loadVideo(videoId, options);
+    return;
+  }
+  try {
+    const record = await loadLocalMedia(videoId);
+    if (!record) {
+      store.set({
+        view: 'practice',
+        mediaSource: 'local',
+        videoId,
+        objectUrl: null,
+        localFileName: '',
+        inputValue: '',
+        status: 'error',
+        playerError: 'Open the original MP3 or WAV file again to practice this loop.',
+        videoTitle: options.title || 'Local audio',
+        author: options.author || 'Local file',
+        isPlaying: false,
+      });
+      document.title = 'Loopmaster';
+      return;
+    }
+    const file = new File([record.blob], record.name, { type: record.type });
+    await loadLocalFile(file, {
+      ...options,
+      mediaId: videoId,
+      title: options.title || titleFromFileName(record.name),
+      author: options.author || 'Local file',
+    });
+  } catch {
+    markError('We could not open that audio file. Try choosing it again.');
+  }
 }
 
 export function openSettings() {
@@ -218,9 +321,13 @@ export function loadVideo(videoId: string, options: LoadOptions = {}) {
   }
 
   const playbackRate = clamp(roundRate(options.rate ?? state.playbackRate), MIN_RATE, MAX_RATE);
+  const previousUrl = state.objectUrl;
   store.set({
     view: 'practice',
+    mediaSource: 'youtube',
     videoId,
+    objectUrl: null,
+    localFileName: '',
     inputValue: canonicalWatchUrl(videoId),
     inputError: null,
     playerError: null,
@@ -241,6 +348,7 @@ export function loadVideo(videoId: string, options: LoadOptions = {}) {
     status: 'loading',
     loadToken: state.loadToken + 1,
   });
+  revokeObjectUrl(previousUrl);
   document.title = 'Loading — Loopmaster';
   syncUrl();
 }
@@ -248,7 +356,7 @@ export function loadVideo(videoId: string, options: LoadOptions = {}) {
 export function retryVideo() {
   const state = store.getState();
   if (!state.videoId) return;
-  loadVideo(state.videoId, {
+  const options: LoadOptions = {
     force: true,
     start: state.loopStart,
     end: state.loopEnd,
@@ -257,7 +365,12 @@ export function retryVideo() {
     title: state.videoTitle,
     author: state.author,
     thumbnailUrl: state.thumbnailUrl,
-  });
+  };
+  if (state.mediaSource === 'local' || isLocalMediaId(state.videoId)) {
+    void openLocalMedia(state.videoId, options);
+    return;
+  }
+  loadVideo(state.videoId, options);
 }
 
 export function applyMetadata(videoId: string, metadata: VideoMetadata) {
@@ -293,6 +406,7 @@ export function markReady(info: {
     author,
     thumbnailUrl: state.thumbnailUrl,
     lastOpenedAt: Date.now(),
+    mediaSource: state.mediaSource,
   };
   const history = [
     entry,
@@ -505,13 +619,14 @@ export function saveCurrentLoop() {
     id: crypto.randomUUID(),
     name: `${title} · ${formatTime(state.loopStart, true)}–${formatTime(state.loopEnd, true)}`,
     videoId: state.videoId,
-    videoTitle: state.videoTitle || 'Untitled video',
+    videoTitle: state.videoTitle || (state.mediaSource === 'local' ? 'Local audio' : 'Untitled video'),
     author: state.author,
     thumbnailUrl: state.thumbnailUrl,
     loopStart: state.loopStart,
     loopEnd: state.loopEnd,
     playbackRate: state.playbackRate,
     createdAt: Date.now(),
+    mediaSource: state.mediaSource,
   };
   const savedLoops = [loop, ...state.savedLoops].slice(0, 100);
   store.set({ savedLoops });
@@ -536,7 +651,7 @@ export function deleteSavedLoop(id: string) {
 }
 
 export function playSavedLoop(loop: SavedLoop) {
-  loadVideo(loop.videoId, {
+  const options: LoadOptions = {
     start: loop.loopStart,
     end: loop.loopEnd,
     rate: loop.playbackRate,
@@ -545,7 +660,12 @@ export function playSavedLoop(loop: SavedLoop) {
     title: loop.videoTitle,
     author: loop.author,
     thumbnailUrl: loop.thumbnailUrl,
-  });
+  };
+  if (loop.mediaSource === 'local' || isLocalMediaId(loop.videoId)) {
+    void openLocalMedia(loop.videoId, options);
+    return;
+  }
+  loadVideo(loop.videoId, options);
 }
 
 export function clearHistory() {

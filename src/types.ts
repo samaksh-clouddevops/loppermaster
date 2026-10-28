@@ -2,6 +2,8 @@ export type View = 'practice' | 'saved' | 'history';
 
 export type Status = 'idle' | 'loading' | 'ready' | 'error';
 
+export type MediaSource = 'youtube' | 'local';
+
 export interface SavedLoop {
   id: string;
   name: string;
@@ -13,6 +15,7 @@ export interface SavedLoop {
   loopEnd: number;
   playbackRate: number;
   createdAt: number;
+  mediaSource?: MediaSource;
 }
 
 export interface HistoryEntry {
@@ -21,6 +24,7 @@ export interface HistoryEntry {
   author: string;
   thumbnailUrl: string;
   lastOpenedAt: number;
+  mediaSource?: MediaSource;
 }
 
 export interface PracticeState {
@@ -29,7 +33,10 @@ export interface PracticeState {
   walkthroughOpen: boolean;
   inputValue: string;
   inputError: string | null;
+  mediaSource: MediaSource;
   videoId: string | null;
+  objectUrl: string | null;
+  localFileName: string;
   videoTitle: string;
   author: string;
   thumbnailUrl: string;

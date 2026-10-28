@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { formatRate, formatTime, formatWhen } from '../lib/time';
-import { deleteSavedLoop, loadVideo, playSavedLoop, renameSavedLoop } from '../state/store';
+import { isLocalMediaId } from '../lib/localMedia';
+import { deleteSavedLoop, loadVideo, openLocalMedia, playSavedLoop, renameSavedLoop } from '../state/store';
 import { useFocusHeading, usePracticeState } from '../state/hooks';
-import type { SavedLoop } from '../types';
+import type { HistoryEntry, SavedLoop } from '../types';
 
 export function SavedLoops() {
   const { savedLoops, view } = usePracticeState();
@@ -51,7 +52,10 @@ function SavedLoopRow({ loop }: { loop: SavedLoop }) {
         {loop.thumbnailUrl ? (
           <img className="thumb" src={loop.thumbnailUrl} alt="" width={160} height={90} />
         ) : (
-          <span className="thumb thumb-empty" aria-hidden="true" />
+          <span
+            className={`thumb thumb-empty${loop.mediaSource === 'local' || isLocalMediaId(loop.videoId) ? ' thumb-audio' : ''}`}
+            aria-hidden="true"
+          />
         )}
         <span className="row-copy">
           {mode === 'rename' ? (
@@ -60,7 +64,11 @@ function SavedLoopRow({ loop }: { loop: SavedLoop }) {
             <span className="row-name">{loop.name}</span>
           )}
           <span className="row-meta">
-            {loop.author ? `${loop.author} · ` : ''}
+            {loop.mediaSource === 'local' || isLocalMediaId(loop.videoId)
+              ? 'Local audio · '
+              : loop.author
+                ? `${loop.author} · `
+                : ''}
             {formatTime(loop.loopStart, true)} → {formatTime(loop.loopEnd, true)} · {formatRate(loop.playbackRate)}
           </span>
         </span>
@@ -142,12 +150,12 @@ export function HistoryPanel() {
         <h1 id="history-title" data-view-title tabIndex={-1} ref={headingRef}>
           History
         </h1>
-        <p className="library-copy">Videos you load on this browser.</p>
+        <p className="library-copy">Videos and local audio files you open on this browser.</p>
       </div>
       {history.length === 0 ? (
         <div className="empty-panel">
           <h2>Nothing played yet</h2>
-          <p>Videos you load will be listed here.</p>
+          <p>Videos and audio files you open will be listed here.</p>
         </div>
       ) : (
         <ul className="loop-list">
@@ -160,34 +168,35 @@ export function HistoryPanel() {
   );
 }
 
-function HistoryRow({
-  entry,
-}: {
-  entry: { videoId: string; videoTitle: string; author: string; thumbnailUrl: string; lastOpenedAt: number };
-}) {
+function HistoryRow({ entry }: { entry: HistoryEntry }) {
+  const isLocal = entry.mediaSource === 'local' || isLocalMediaId(entry.videoId);
+
+  function open() {
+    const options = {
+      force: true,
+      title: entry.videoTitle,
+      author: entry.author,
+      thumbnailUrl: entry.thumbnailUrl,
+    };
+    if (isLocal) {
+      void openLocalMedia(entry.videoId, options);
+      return;
+    }
+    loadVideo(entry.videoId, options);
+  }
+
   return (
     <li className="loop-row">
-      <button
-        className="row-open"
-        type="button"
-        onClick={() =>
-          loadVideo(entry.videoId, {
-            force: true,
-            title: entry.videoTitle,
-            author: entry.author,
-            thumbnailUrl: entry.thumbnailUrl,
-          })
-        }
-      >
+      <button className="row-open" type="button" onClick={open}>
         {entry.thumbnailUrl ? (
           <img className="thumb" src={entry.thumbnailUrl} alt="" width={160} height={90} />
         ) : (
-          <span className="thumb thumb-empty" aria-hidden="true" />
+          <span className={`thumb thumb-empty${isLocal ? ' thumb-audio' : ''}`} aria-hidden="true" />
         )}
         <span className="row-copy">
           <span className="row-name">{entry.videoTitle}</span>
           <span className="row-meta">
-            {entry.author ? `${entry.author} · ` : ''}
+            {isLocal ? 'Local audio · ' : entry.author ? `${entry.author} · ` : ''}
             {formatWhen(entry.lastOpenedAt)}
           </span>
         </span>

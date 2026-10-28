@@ -7,7 +7,7 @@ import type { View } from '../types';
 const features = [
   {
     title: 'Slow down',
-    copy: 'Practice difficult sections at your own speed.',
+    copy: 'Practice difficult sections at your own speed. Use MP3 or WAV for clearer slowdowns.',
     icon: <IconSpeed />,
   },
   {

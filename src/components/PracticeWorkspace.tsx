@@ -4,6 +4,7 @@ import { useFocusHeading, usePracticeState } from '../state/hooks';
 import { EmptyState } from './EmptyState';
 import { VideoLoader } from './VideoLoader';
 import { VideoPlayer } from './VideoPlayer';
+import { AudioPlayer } from './AudioPlayer';
 import { PlaybackControls } from './PlaybackControls';
 import { PracticeTimeline } from './PracticeTimeline';
 import { LoopControls } from './LoopControls';
@@ -28,7 +29,7 @@ export function PracticeWorkspace() {
 }
 
 function Session({ active }: { active: boolean }) {
-  const { status, videoTitle, author } = usePracticeState();
+  const { status, videoTitle, author, mediaSource } = usePracticeState();
   const stageRef = useRef<HTMLDivElement>(null);
   const headingRef = useFocusHeading('practice', active);
   const ready = status === 'ready';
@@ -49,7 +50,7 @@ function Session({ active }: { active: boolean }) {
       <div className="studio" ref={stageRef} aria-busy={status === 'loading'}>
         <div className="stage">
           <div className="video-fit">
-            <VideoPlayer />
+            {mediaSource === 'local' ? <AudioPlayer /> : <VideoPlayer />}
           </div>
           {ready && (
             <>
