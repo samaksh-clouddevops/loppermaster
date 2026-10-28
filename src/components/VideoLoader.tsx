@@ -1,10 +1,31 @@
-import { useRef, type ChangeEvent, type FormEvent } from 'react';
-import { loadLocalFile, setInputValue, submitUrl } from '../state/store';
+import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type FormEvent } from 'react';
+import { isSupportedAudioFile } from '../lib/localMedia';
+import { loadLocalFile, setInputValue, store, submitUrl } from '../state/store';
 import { usePracticeState } from '../state/hooks';
+
+function pickAudioFile(files: FileList | null | undefined) {
+  if (!files?.length) return null;
+  return Array.from(files).find(isSupportedAudioFile) ?? null;
+}
+
+function openDroppedAudio(files: FileList | null | undefined) {
+  const file = pickAudioFile(files);
+  if (!file) {
+    store.set({ inputError: 'Drop an MP3 or WAV file.' });
+    return;
+  }
+  void loadLocalFile(file);
+}
+
+function transferHasFiles(transfer: DataTransfer | null) {
+  return Boolean(transfer && [...transfer.types].includes('Files'));
+}
 
 export function VideoLoader({ prominent = false }: { prominent?: boolean }) {
   const { inputValue, inputError, mediaSource } = usePracticeState();
   const fileRef = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const dragDepth = useRef(0);
   const helpId = prominent ? 'url-help' : undefined;
   const errorId = 'url-error';
 
@@ -20,8 +41,76 @@ export function VideoLoader({ prominent = false }: { prominent?: boolean }) {
     void loadLocalFile(file);
   }
 
+  function clearDrag() {
+    dragDepth.current = 0;
+    setDragging(false);
+  }
+
+  function onDragEnter(event: DragEvent) {
+    if (!transferHasFiles(event.dataTransfer)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    dragDepth.current += 1;
+    setDragging(true);
+  }
+
+  function onDragOver(event: DragEvent) {
+    if (!transferHasFiles(event.dataTransfer)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = 'copy';
+  }
+
+  function onDragLeave(event: DragEvent) {
+    if (!transferHasFiles(event.dataTransfer)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    dragDepth.current = Math.max(0, dragDepth.current - 1);
+    if (dragDepth.current === 0) setDragging(false);
+  }
+
+  function onDrop(event: DragEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    clearDrag();
+    openDroppedAudio(event.dataTransfer.files);
+  }
+
+  useEffect(() => {
+    function onWindowDragOver(event: globalThis.DragEvent) {
+      if (!transferHasFiles(event.dataTransfer)) return;
+      event.preventDefault();
+    }
+
+    function onWindowDrop(event: globalThis.DragEvent) {
+      if (!transferHasFiles(event.dataTransfer)) return;
+      event.preventDefault();
+      clearDrag();
+      openDroppedAudio(event.dataTransfer?.files);
+    }
+
+    function onWindowDragEnd() {
+      clearDrag();
+    }
+
+    window.addEventListener('dragover', onWindowDragOver);
+    window.addEventListener('drop', onWindowDrop);
+    window.addEventListener('dragend', onWindowDragEnd);
+    return () => {
+      window.removeEventListener('dragover', onWindowDragOver);
+      window.removeEventListener('drop', onWindowDrop);
+      window.removeEventListener('dragend', onWindowDragEnd);
+    };
+  }, []);
+
   return (
-    <div className={prominent ? 'url-block url-block-prominent' : 'url-block'}>
+    <div
+      className={`${prominent ? 'url-block url-block-prominent' : 'url-block'}${dragging ? ' is-drop-target' : ''}`}
+      onDragEnter={onDragEnter}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
       <form className="url-form" onSubmit={onSubmit}>
         <label className={prominent ? 'url-label' : 'section-label'} htmlFor="youtube-url">
           {prominent ? 'Practice any YouTube video or audio file' : 'YouTube URL or local audio'}
@@ -32,7 +121,7 @@ export function VideoLoader({ prominent = false }: { prominent?: boolean }) {
             className="field"
             value={inputValue}
             onChange={(event) => setInputValue(event.target.value)}
-            placeholder="Paste a YouTube URL, or open an MP3 / WAV"
+            placeholder="Paste a YouTube URL, or drop an MP3 / WAV"
             autoCapitalize="off"
             autoCorrect="off"
             spellCheck={false}
@@ -55,12 +144,17 @@ export function VideoLoader({ prominent = false }: { prominent?: boolean }) {
           />
         </div>
       </form>
-      {prominent && !inputError && (
-        <p id="url-help" className="url-help">
-          Paste a YouTube URL, or open an MP3 / WAV for clearer slow practice.
+      {dragging && (
+        <p className="url-drop-hint" role="status">
+          Drop MP3 or WAV to practice
         </p>
       )}
-      {!prominent && mediaSource === 'local' && !inputError && (
+      {prominent && !inputError && !dragging && (
+        <p id="url-help" className="url-help">
+          Paste a YouTube URL, or drag in an MP3 / WAV for clearer slow practice.
+        </p>
+      )}
+      {!prominent && mediaSource === 'local' && !inputError && !dragging && (
         <p className="url-help">Local audio keeps pitch when you slow it down.</p>
       )}
       {inputError && (
