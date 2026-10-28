@@ -10,6 +10,8 @@ import { MIN_LOOP_GAP } from '../lib/range';
 import { formatSpoken, formatTime, timelineTicks } from '../lib/time';
 import { scrubTo, seekTo, setLoopBound, store, togglePlay } from '../state/store';
 import { usePracticeState } from '../state/hooks';
+import { useLocalAnalysis } from '../state/useLocalAnalysis';
+import { ChordStrip } from './ChordStrip';
 
 function timeFromClientX(clientX: number, track: HTMLElement, duration: number) {
   const rect = track.getBoundingClientRect();
@@ -19,8 +21,10 @@ function timeFromClientX(clientX: number, track: HTMLElement, duration: number) 
 }
 
 export function PracticeTimeline() {
-  const { duration, loopStart, loopEnd, loopEnabled } = usePracticeState();
+  const { duration, loopStart, loopEnd, loopEnabled, mediaSource } = usePracticeState();
+  const { analysis } = useLocalAnalysis();
   const trackRef = useRef<HTMLDivElement>(null);
+  const waveRef = useRef<HTMLCanvasElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
   const playheadRef = useRef<HTMLButtonElement>(null);
   const [hover, setHover] = useState<{ x: number; time: number } | null>(null);
@@ -29,6 +33,8 @@ export function PracticeTimeline() {
   const span = Math.max(duration, 0.001);
   const regionStart = (loopStart / span) * 100;
   const regionWidth = (Math.max(loopEnd - loopStart, 0) / span) * 100;
+  const beatTimes = mediaSource === 'local' ? analysis?.beatTimes ?? [] : [];
+  const waveform = mediaSource === 'local' ? analysis?.waveform ?? null : null;
 
   useLayoutEffect(() => {
     const write = () => {
@@ -45,6 +51,39 @@ export function PracticeTimeline() {
     write();
     return store.subscribeTime(write);
   }, [duration]);
+
+  useLayoutEffect(() => {
+    const canvas = waveRef.current;
+    if (!canvas || !waveform || waveform.length === 0) return;
+    const parent = canvas.parentElement;
+    if (!parent) return;
+
+    const paint = () => {
+      const width = Math.max(1, Math.floor(parent.clientWidth * (window.devicePixelRatio || 1)));
+      const height = Math.max(1, Math.floor(parent.clientHeight * (window.devicePixelRatio || 1)));
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.clearRect(0, 0, width, height);
+      const mid = height / 2;
+      const barWidth = width / waveform.length;
+      ctx.fillStyle = 'rgba(148, 163, 184, 0.55)';
+      for (let index = 0; index < waveform.length; index += 1) {
+        const amp = Math.max(0.02, waveform[index] ?? 0);
+        const barHeight = amp * (height * 0.86);
+        const x = index * barWidth;
+        ctx.fillRect(x, mid - barHeight / 2, Math.max(1, barWidth * 0.85), barHeight);
+      }
+    };
+
+    paint();
+    const observer = new ResizeObserver(paint);
+    observer.observe(parent);
+    return () => observer.disconnect();
+  }, [waveform]);
 
   function scrubFrom(clientX: number, commit: boolean) {
     const track = trackRef.current;
@@ -98,15 +137,19 @@ export function PracticeTimeline() {
         <span>{formatTime(duration)}</span>
       </div>
       <div
-        className="track"
+        className={waveform ? 'track has-waveform' : 'track'}
         ref={trackRef}
         onPointerDown={onTrackPointerDown}
         onPointerMove={onTrackPointerMove}
         onPointerLeave={() => setHover(null)}
       >
         <div className="lane" aria-hidden="true">
+          {waveform && <canvas ref={waveRef} className="waveform-canvas" />}
           {ticks.map((tick) => (
             <span key={tick} className="tick" style={{ left: `${(tick / span) * 100}%` }} />
+          ))}
+          {beatTimes.map((beat) => (
+            <span key={`beat-${beat}`} className="beat-mark" style={{ left: `${(beat / span) * 100}%` }} />
           ))}
           <div ref={progressRef} className="progress" />
           <div
@@ -125,8 +168,10 @@ export function PracticeTimeline() {
         <LoopStartHandle duration={duration} value={loopStart} end={loopEnd} />
         <LoopEndHandle duration={duration} value={loopEnd} start={loopStart} />
       </div>
+      <ChordStrip />
       <p className="sr-only">
-        Drag along the timeline to seek. Drag A or B to change the loop, or use the Set A and Set B buttons. Arrow keys move a focused handle.
+        Drag along the timeline to seek. Drag A or B to change the loop, or use the Set A and Set B buttons. Arrow keys
+        move a focused handle.
       </p>
     </section>
   );

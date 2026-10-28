@@ -4,11 +4,13 @@ import { getApiKey, subscribeApiKey } from '../lib/apiKey';
 import { lookupSong, type LookupResult, type SongMatch } from '../lib/getsongbpm';
 import { createMetronome, type Metronome } from '../lib/metronome';
 import { usePracticeState } from '../state/hooks';
+import { useLocalAnalysis } from '../state/useLocalAnalysis';
 
-type Source = 'catalog' | 'preview' | 'tap' | 'manual';
+type Source = 'catalog' | 'preview' | 'file' | 'tap' | 'manual';
 
 export function TempoPanel() {
-  const { videoId, videoTitle, author, status, playbackRate, view } = usePracticeState();
+  const { videoId, videoTitle, author, status, playbackRate, view, mediaSource } = usePracticeState();
+  const local = useLocalAnalysis();
   const apiKey = useSyncExternalStore(subscribeApiKey, getApiKey, getApiKey);
   const [lookup, setLookup] = useState<LookupResult | { status: 'idle' } | { status: 'loading' } | { status: 'needs-key' }>({
     status: 'idle',
@@ -21,8 +23,10 @@ export function TempoPanel() {
   const [clickVolume, setClickVolume] = useState(70);
   const taps = useRef<number[]>([]);
   const metro = useRef<Metronome | null>(null);
+  const manualOverride = useRef(false);
 
-  const clickBpm = (source === 'catalog' || source === 'preview') && baseBpm > 0 ? Math.round(baseBpm * playbackRate) : baseBpm;
+  const scaledSources = source === 'catalog' || source === 'preview' || source === 'file';
+  const clickBpm = scaledSources && baseBpm > 0 ? Math.round(baseBpm * playbackRate) : baseBpm;
   const match = lookup.status === 'found' ? lookup.match : null;
 
   function engine() {
@@ -49,13 +53,49 @@ export function TempoPanel() {
   }, []);
 
   useEffect(() => {
+    manualOverride.current = false;
+  }, [videoId]);
+
+  useEffect(() => {
     if (status !== 'ready' || !videoId || !videoTitle) return;
+    if (manualOverride.current) return;
+
+    if (mediaSource === 'local') {
+      if (local.status === 'loading' || local.status === 'idle') {
+        setLookup({ status: 'loading' });
+        return;
+      }
+      if (local.status === 'ready' && local.analysis) {
+        const analysis = local.analysis;
+        setLookup({
+          status: 'found',
+          match: {
+            id: videoId,
+            title: videoTitle,
+            artist: author || 'Local file',
+            bpm: analysis.bpm,
+            keyName: analysis.keyName,
+            openKey: '',
+            beatsPerBar: 4,
+            notes: analysis.notes,
+            pageUrl: '',
+            sourceName: 'your audio file',
+          },
+        });
+        setBaseBpm(analysis.bpm);
+        setBeats(4);
+        setSource('file');
+        return;
+      }
+      // Fall through to catalog/preview if file analysis failed.
+    }
+
     let cancelled = false;
     setLookup({ status: 'loading' });
-    const apply = (match: SongMatch, nextSource: Source) => {
-      setLookup({ status: 'found', match });
-      setBaseBpm(match.bpm);
-      setBeats(match.beatsPerBar || 4);
+    const apply = (next: SongMatch, nextSource: Source) => {
+      setLookup({ status: 'found', match: next });
+      setBaseBpm(next.bpm);
+      setBeats(next.beatsPerBar || 4);
       setSource(nextSource);
     };
     void (async () => {
@@ -93,12 +133,13 @@ export function TempoPanel() {
     return () => {
       cancelled = true;
     };
-  }, [apiKey, author, status, videoId, videoTitle]);
+  }, [apiKey, author, local.analysis, local.status, mediaSource, status, videoId, videoTitle]);
 
   function applyBpm(next: number, nextSource: Source) {
     const bpm = Math.min(240, Math.max(40, Math.round(next)));
     setBaseBpm(bpm);
     setSource(nextSource);
+    if (nextSource === 'tap' || nextSource === 'manual') manualOverride.current = true;
   }
 
   function tap() {
@@ -140,8 +181,8 @@ export function TempoPanel() {
           Tap tempo
         </button>
       </div>
-      <LookupStatus lookup={lookup} hasKey={Boolean(apiKey)} />
-      {match && (
+      <LookupStatus lookup={lookup} hasKey={Boolean(apiKey)} mediaSource={mediaSource} analysisStatus={local.status} />
+      {match && source !== 'file' && (
         <p className="tempo-match">
           {match.artist ? `${match.artist} — ` : ''}
           {match.title}
@@ -206,7 +247,7 @@ export function TempoPanel() {
       </div>
       <p className="rate-note">
         The metronome follows the tempo you hear, so slowing the video slows the click.
-        {match && (
+        {match && match.pageUrl && (
           <>
             {' '}
             Song data from{' '}
@@ -235,6 +276,14 @@ function TempoCaption({
   if (clickBpm <= 0) return <p className="rate-note">Look up the song, or tap along with it.</p>;
   if (source === 'tap') return <p className="rate-note">From your taps, at the speed you are hearing.</p>;
   if (source === 'manual') return <p className="rate-note">Set by hand for this practice speed.</p>;
+  if (source === 'file') {
+    if (Math.abs(playbackRate - 1) < 0.001) return <p className="rate-note">From your audio file, {baseBpm} BPM.</p>;
+    return (
+      <p className="rate-note">
+        From your audio file, {baseBpm} BPM. At {playbackRate.toFixed(2)}× the click is {clickBpm}.
+      </p>
+    );
+  }
   if (source === 'preview') {
     return (
       <p className="rate-note">
@@ -253,10 +302,21 @@ function TempoCaption({
 function LookupStatus({
   lookup,
   hasKey,
+  mediaSource,
+  analysisStatus,
 }: {
   lookup: LookupResult | { status: 'idle' } | { status: 'loading' } | { status: 'needs-key' };
   hasKey: boolean;
+  mediaSource: string;
+  analysisStatus: string;
 }) {
+  if (mediaSource === 'local' && (analysisStatus === 'loading' || analysisStatus === 'idle') && lookup.status === 'loading') {
+    return (
+      <p className="rate-note" role="status">
+        Analyzing audio…
+      </p>
+    );
+  }
   if (!hasKey && lookup.status === 'needs-key') {
     return <p className="rate-note">No song preview was found. Tap the tempo, or add a GetSongBPM key in Settings.</p>;
   }

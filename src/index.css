@@ -746,12 +746,90 @@ button:disabled {
   border: 1px solid var(--color-border);
 }
 
+.waveform-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0.9;
+}
+
 .tick {
   position: absolute;
   top: 0;
   bottom: 0;
   width: 1px;
   background: rgba(255, 255, 255, 0.08);
+}
+
+.beat-mark {
+  position: absolute;
+  top: 8%;
+  bottom: 8%;
+  width: 1px;
+  background: rgba(148, 163, 184, 0.28);
+  pointer-events: none;
+}
+
+.chord-strip {
+  display: grid;
+  gap: 6px;
+  padding-inline: 22px;
+}
+
+.chord-strip.is-pending,
+.chord-strip.is-empty {
+  min-height: 28px;
+  color: var(--color-muted-foreground);
+  font-size: 13px;
+}
+
+.chord-strip-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.chord-lane {
+  position: relative;
+  height: 34px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+}
+
+.chord-seg {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  margin: 0;
+  padding: 0 4px;
+  border: 0;
+  border-right: 1px solid rgba(8, 10, 18, 0.45);
+  background: rgba(94, 234, 212, 0.12);
+  color: var(--color-foreground);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.chord-seg.is-active {
+  background: rgba(74, 222, 128, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(74, 222, 128, 0.55);
+}
+
+.chord-seg span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .progress {
@@ -1728,6 +1806,19 @@ kbd {
 
   .lane {
     height: 44px;
+  }
+
+  .chord-strip {
+    padding-inline: 0;
+    gap: 4px;
+  }
+
+  .chord-lane {
+    height: 28px;
+  }
+
+  .chord-seg {
+    font-size: 10px;
   }
 
   .playhead {

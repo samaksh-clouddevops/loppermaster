@@ -19,6 +19,25 @@ import {
 } from '../lib/storage';
 import { MAX_RATE, MIN_LOOP_GAP, MIN_RATE, clamp, nearestRate, orderLoop, roundRate } from '../lib/range';
 import type { HistoryEntry, LoadOptions, PracticeState, SavedLoop, VideoMetadata, View } from '../types';
+import { getLocalAnalysisState } from './localAnalysis';
+
+function nearestBeatTime(time: number, beats: number[]) {
+  if (beats.length === 0) return time;
+  let best = beats[0] ?? time;
+  let bestDelta = Math.abs(best - time);
+  for (const beat of beats) {
+    const delta = Math.abs(beat - time);
+    if (delta < bestDelta) {
+      best = beat;
+      bestDelta = delta;
+    }
+  }
+  return best;
+}
+
+function getLocalAnalysisBeats() {
+  return getLocalAnalysisState().analysis?.beatTimes ?? [];
+}
 
 export interface PlaybackEngine {
   seek: (seconds: number) => void;
@@ -575,10 +594,15 @@ export function setLoopBound(edge: 'start' | 'end', value: number, commit = fals
 export function setLoopAtPlayhead(edge: 'a' | 'b') {
   const state = store.getState();
   if (state.status !== 'ready') return;
+  let playhead = state.currentTime;
+  if (state.mediaSource === 'local') {
+    const beats = getLocalAnalysisBeats();
+    if (beats.length > 0) playhead = nearestBeatTime(playhead, beats);
+  }
   const ordered =
     edge === 'a'
-      ? orderLoop(state.currentTime, state.loopEnd || state.duration, state.duration)
-      : orderLoop(state.loopStart, state.currentTime, state.duration);
+      ? orderLoop(playhead, state.loopEnd || state.duration, state.duration)
+      : orderLoop(state.loopStart, playhead, state.duration);
   store.set(ordered);
   syncUrl();
 }

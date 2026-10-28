@@ -10,6 +10,29 @@ export interface PreviewAnalysis {
   pageUrl: string;
 }
 
+export interface ChordSegment {
+  start: number;
+  end: number;
+  label: string;
+}
+
+export interface LocalAudioAnalysis {
+  bpm: number;
+  keyName: string;
+  notes: string[];
+  beatTimes: number[];
+  chords: ChordSegment[];
+  waveform: Float32Array;
+  duration: number;
+  buffer: AudioBuffer;
+}
+
+const ANALYSIS_CAP_SECONDS = 8 * 60;
+const WAVEFORM_BUCKETS = 1000;
+const MAJOR_TRIAD = [1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0];
+const MINOR_TRIAD = [1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0];
+const DOM7_TRIAD = [1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0];
+
 interface PreviewHit {
   trackName?: string;
   artistName?: string;
@@ -43,7 +66,7 @@ async function findPreview(query: SongQuery): Promise<PreviewHit | null> {
   return results.find((hit) => titleHit(hit, query)) ?? results.find((hit) => hit.previewUrl) ?? null;
 }
 
-function mono(buffer: AudioBuffer) {
+export function mono(buffer: AudioBuffer) {
   const length = buffer.length;
   const mixed = new Float32Array(length);
   const channels = [];
@@ -54,6 +77,183 @@ function mono(buffer: AudioBuffer) {
     mixed[index] = sum / channels.length;
   }
   return mixed;
+}
+
+export async function decodeObjectUrl(url: string): Promise<AudioBuffer> {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error('Could not read the audio file.');
+  const bytes = await response.arrayBuffer();
+  const context = new AudioContext();
+  try {
+    return await context.decodeAudioData(bytes.slice(0));
+  } finally {
+    await context.close();
+  }
+}
+
+function buildWaveform(samples: Float32Array, buckets = WAVEFORM_BUCKETS) {
+  const peaks = new Float32Array(buckets);
+  const block = Math.max(1, Math.floor(samples.length / buckets));
+  for (let bucket = 0; bucket < buckets; bucket += 1) {
+    const start = bucket * block;
+    const end = Math.min(samples.length, start + block);
+    let peak = 0;
+    for (let index = start; index < end; index += 1) {
+      const value = Math.abs(samples[index] ?? 0);
+      if (value > peak) peak = value;
+    }
+    peaks[bucket] = peak;
+  }
+  return peaks;
+}
+
+function detectBeatTimes(samples: Float32Array, sampleRate: number, bpm: number, duration: number) {
+  if (bpm < 40 || bpm > 220 || duration <= 0) return [];
+  const { flux, hop } = spectralFlux(samples, sampleRate);
+  const hopSeconds = hop / sampleRate;
+  const interval = 60 / bpm;
+  const maxOffsetFrames = Math.max(1, Math.round(interval / hopSeconds));
+  let bestOffset = 0;
+  let bestScore = -1;
+  for (let offset = 0; offset < maxOffsetFrames; offset += 1) {
+    let score = 0;
+    for (let frame = offset; frame < flux.length; frame += maxOffsetFrames) score += flux[frame] ?? 0;
+    if (score > bestScore) {
+      bestScore = score;
+      bestOffset = offset;
+    }
+  }
+  const phase = bestOffset * hopSeconds;
+  const beats: number[] = [];
+  for (let time = phase; time < duration; time += interval) {
+    if (time >= 0) beats.push(Number(time.toFixed(3)));
+  }
+  return beats;
+}
+
+function frameChroma(samples: Float32Array, sampleRate: number, start: number, size: number) {
+  const chroma = new Float64Array(12);
+  const real = new Float32Array(size);
+  const imag = new Float32Array(size);
+  const lowestBin = Math.ceil((65 * size) / sampleRate);
+  const highestBin = Math.floor((1100 * size) / sampleRate);
+  for (let index = 0; index < size; index += 1) {
+    const hann = 0.5 * (1 - Math.cos((2 * Math.PI * index) / (size - 1)));
+    real[index] = (samples[start + index] ?? 0) * hann;
+    imag[index] = 0;
+  }
+  fft(real, imag);
+  for (let bin = lowestBin; bin <= highestBin; bin += 1) {
+    const frequency = (bin * sampleRate) / size;
+    const midi = 69 + 12 * Math.log2(frequency / 440);
+    const wrapped = ((midi % 12) + 12) % 12;
+    const lower = Math.floor(wrapped);
+    const fraction = wrapped - lower;
+    const weight = Math.hypot(real[bin] ?? 0, imag[bin] ?? 0);
+    chroma[lower % 12] = (chroma[lower % 12] ?? 0) + weight * (1 - fraction);
+    chroma[(lower + 1) % 12] = (chroma[(lower + 1) % 12] ?? 0) + weight * fraction;
+  }
+  let energy = 0;
+  for (let pitch = 0; pitch < 12; pitch += 1) energy += chroma[pitch] ?? 0;
+  if (energy > 0) {
+    for (let pitch = 0; pitch < 12; pitch += 1) chroma[pitch] = (chroma[pitch] ?? 0) / energy;
+  }
+  return chroma;
+}
+
+function bestChordLabel(chroma: Float64Array) {
+  let bestLabel = 'N';
+  let bestScore = 0.28;
+  for (let root = 0; root < 12; root += 1) {
+    const major = correlation(chroma, MAJOR_TRIAD, root);
+    const minor = correlation(chroma, MINOR_TRIAD, root);
+    const dom7 = correlation(chroma, DOM7_TRIAD, root);
+    if (major > bestScore) {
+      bestScore = major;
+      bestLabel = NAMES[root] ?? 'N';
+    }
+    if (minor > bestScore) {
+      bestScore = minor;
+      bestLabel = `${NAMES[root]}m`;
+    }
+    if (dom7 > bestScore + 0.02) {
+      bestScore = dom7;
+      bestLabel = `${NAMES[root]}7`;
+    }
+  }
+  return bestLabel;
+}
+
+function detectChords(samples: Float32Array, sampleRate: number, duration: number): ChordSegment[] {
+  const size = 4096;
+  const hop = 2048;
+  const hopSeconds = hop / sampleRate;
+  const labels: string[] = [];
+  for (let start = 0; start + size < samples.length; start += hop) {
+    const chroma = frameChroma(samples, sampleRate, start, size);
+    labels.push(bestChordLabel(chroma));
+  }
+  // Median smooth over a short window to reduce flicker.
+  const smoothed = labels.map((label, index) => {
+    const window = labels.slice(Math.max(0, index - 2), Math.min(labels.length, index + 3));
+    const counts = new Map<string, number>();
+    for (const item of window) counts.set(item, (counts.get(item) ?? 0) + 1);
+    let winner = label;
+    let best = 0;
+    for (const [item, count] of counts) {
+      if (count > best) {
+        best = count;
+        winner = item;
+      }
+    }
+    return winner;
+  });
+
+  const chords: ChordSegment[] = [];
+  let index = 0;
+  while (index < smoothed.length) {
+    const label = smoothed[index] ?? 'N';
+    let end = index + 1;
+    while (end < smoothed.length && smoothed[end] === label) end += 1;
+    const startTime = index * hopSeconds;
+    const endTime = Math.min(duration, end * hopSeconds);
+    if (label !== 'N' && endTime - startTime >= 0.35) {
+      chords.push({ start: Number(startTime.toFixed(2)), end: Number(endTime.toFixed(2)), label });
+    }
+    index = end;
+  }
+  return chords;
+}
+
+export function analyzeLocalBuffer(buffer: AudioBuffer): LocalAudioAnalysis {
+  const duration = buffer.duration;
+  const sampleRate = buffer.sampleRate;
+  const fullSamples = mono(buffer);
+  const analysisSamples =
+    duration > ANALYSIS_CAP_SECONDS
+      ? fullSamples.subarray(0, Math.floor(ANALYSIS_CAP_SECONDS * sampleRate))
+      : fullSamples;
+  const analysisDuration = analysisSamples.length / sampleRate;
+  const bpm = detectBpmFromChannel(analysisSamples, sampleRate);
+  const key = detectKeyFromChannel(analysisSamples, sampleRate);
+  const beatTimes = detectBeatTimes(analysisSamples, sampleRate, bpm, analysisDuration);
+  const chords = detectChords(analysisSamples, sampleRate, analysisDuration);
+  const waveform = buildWaveform(fullSamples);
+  return {
+    bpm: Math.min(220, Math.max(40, bpm)),
+    keyName: key.keyName,
+    notes: key.notes,
+    beatTimes,
+    chords,
+    waveform,
+    duration,
+    buffer,
+  };
+}
+
+export async function analyzeLocalObjectUrl(url: string): Promise<LocalAudioAnalysis> {
+  const buffer = await decodeObjectUrl(url);
+  return analyzeLocalBuffer(buffer);
 }
 
 function spectralFlux(samples: Float32Array, sampleRate: number) {

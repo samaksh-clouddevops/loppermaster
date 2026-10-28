@@ -6,6 +6,14 @@ export function usePracticeState() {
   return useSyncExternalStore(store.subscribe, store.getState, store.getState);
 }
 
+export function usePracticeTime() {
+  return useSyncExternalStore(
+    store.subscribeTime,
+    () => store.getState().currentTime,
+    () => store.getState().currentTime,
+  );
+}
+
 export function useFocusHeading(view: View, active: boolean) {
   const ref = useRef<HTMLHeadingElement>(null);
 
